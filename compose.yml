@@ -30,6 +30,23 @@ services:
     command: >
       sh -c "
         apk add --no-cache gettext python3 py3-yaml &&
+        echo 'Checking for config generation script...' &&
+        if [ ! -f './scripts/generate-config-universal.sh' ]; then
+          echo 'generate-config-universal.sh not found, using available script...' &&
+          if [ -f './scripts/generate-config-advanced.sh' ]; then
+            echo 'Using generate-config-advanced.sh' &&
+            cp ./scripts/generate-config-advanced.sh ./scripts/generate-config-universal.sh &&
+            chmod +x ./scripts/generate-config-universal.sh
+          elif [ -f './scripts/generate-config.sh' ]; then
+            echo 'Using generate-config.sh' &&
+            cp ./scripts/generate-config.sh ./scripts/generate-config-universal.sh &&
+            chmod +x ./scripts/generate-config-universal.sh
+          else
+            echo 'ERROR: No config generation script found!' &&
+            exit 1
+          fi
+        fi &&
+        echo 'Starting config generation...' &&
         ./scripts/generate-config-universal.sh generate .env &&
         echo 'Configuration generation completed successfully'
       "
