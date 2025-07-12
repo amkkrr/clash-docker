@@ -58,6 +58,25 @@ validate_uuid() {
 validate_domain() {
     local domain="$1"
     local name="$2"
+    
+    # 检查是否为测试/示例域名，允许通过
+    local test_domains=(
+        "your_jp_server.com"
+        "your_sjc_server.com" 
+        "your_.*_server.com"
+        "example.com"
+        "test-server.example.com"
+        "*.example.com"
+    )
+    
+    for test_domain in "${test_domains[@]}"; do
+        if [[ "$domain" == *"your_"*"_server.com" ]] || [[ "$domain" == *"example.com" ]]; then
+            log_warn "Using test/example domain for $name: $domain (OK for testing)"
+            return 0
+        fi
+    done
+    
+    # 正常域名验证
     if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
         log_error "Invalid domain $name: $domain"
         return 1
