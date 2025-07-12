@@ -29,7 +29,7 @@ services:
       - .env
     command: >
       sh -c "
-        apk add --no-cache gettext python3 py3-yaml &&
+        apk add --no-cache gettext python3 py3-yaml bash &&
         echo 'Checking for config generation script...' &&
         if [ ! -f './scripts/generate-config-universal.sh' ]; then
           echo 'generate-config-universal.sh not found, using available script...' &&
