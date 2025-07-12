@@ -1,0 +1,65 @@
+# Prometheus 告警规则
+# 定义 Clash Docker 服务的告警条件
+
+groups:
+  - name: clash-docker-alerts
+    rules:
+      # Clash 服务可用性告警
+      - alert: ClashServiceDown
+        expr: up{job="clash"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Clash service is down"
+          description: "Clash service has been down for more than 30 seconds"
+          
+      # Nginx 服务可用性告警
+      - alert: NginxServiceDown
+        expr: up{job="nginx"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx service is down"
+          description: "Nginx service has been down for more than 30 seconds"
+          
+      # 高内存使用率告警
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Container {{ $labels.name }} memory usage is above 80%"
+          
+      # 高CPU使用率告警
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "Container {{ $labels.name }} CPU usage is above 80%"
+          
+      # API响应时间告警
+      - alert: SlowAPIResponse
+        expr: nginx_http_request_duration_seconds{quantile="0.95"} > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow API response time"
+          description: "95th percentile response time is above 1 second"
+          
+      # 磁盘空间告警
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space is below 10%"

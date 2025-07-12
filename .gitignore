@@ -1,14 +1,27 @@
 # Environment files
 .env
+.env.*
+!.env.example
 
 # Clash configuration and data
 config/config.yaml
 config/ruleset/
+config/cache.db
+config/Country.mmdb
+config/data/
+clash.yaml
 data/
 
 # Logs
 logs/
 *.log
+
+# Temporary and runtime files
+*.tmp
+*.temp
+temp/
+.cache/
+*.pid
 
 # OS generated files
 .DS_Store
@@ -31,3 +44,14 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+
+# Security and secrets
+htpasswd
+*.key
+*.pem
+*.crt
+secrets/
+
+.claude/
+
+clash-docker.code-workspace

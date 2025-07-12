@@ -1,0 +1,166 @@
+# Docker Compose 测试配置 - 企业级架构
+# 使用init容器模式，健康检查和监控
+
+services:
+  # 配置生成器 - 使用init容器模式
+  config-generator:
+    image: alpine:latest
+    container_name: clash-config-generator-test
+    volumes:
+      - .:/workspace
+      - ./test-suite/temp:/tmp/clash-temp
+    working_dir: /workspace
+    environment:
+      - ENVIRONMENT=test
+    env_file:
+      - .env.test
+    command: >
+      sh -c "
+        apk add --no-cache gettext python3 py3-yaml &&
+        echo 'Starting configuration generation...' &&
+        ./scripts/generate-config-advanced.sh generate .env.test &&
+        echo 'Configuration generation completed successfully' &&
+        touch /tmp/clash-temp/config-ready.flag
+      "
+    networks:
+      - clash-test-network
+    restart: "no"
+    
+  # Clash 核心服务
+  clash:
+    image: dreamacro/clash:latest
+    container_name: clash-test
+    restart: unless-stopped
+    ports:
+      - "${CLASH_HTTP_PORT:-17890}:${CLASH_HTTP_PORT:-17890}"
+      - "${CLASH_SOCKS_PORT:-17891}:${CLASH_SOCKS_PORT:-17891}"
+      - "${CLASH_CONTROL_PORT:-19090}:${CLASH_CONTROL_PORT:-19090}"
+    environment:
+      - CLASH_SECRET=${CLASH_SECRET}
+      - CLASH_LOG_LEVEL=${CLASH_LOG_LEVEL:-debug}
+    volumes:
+      - ./config:/root/.config/clash:ro
+      - ./data:/root/.config/clash/data
+      - ./test-suite/temp:/tmp/clash-temp:ro
+    networks:
+      - clash-test-network
+    command: >
+      sh -c "
+        echo 'Waiting for configuration...' &&
+        while [ ! -f /tmp/clash-temp/config-ready.flag ]; do
+          echo 'Configuration not ready, waiting...' &&
+          sleep 2
+        done &&
+        echo 'Configuration ready, starting Clash...' &&
+        /clash -d /root/.config/clash -ext-ctl ${CLASH_EXTERNAL_CONTROLLER:-0.0.0.0:19090} -secret ${CLASH_SECRET}
+      "
+    depends_on:
+      config-generator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:${CLASH_CONTROL_PORT:-19090}/version", "||", "exit", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: clash-nginx-test
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-18088}:80"
+    volumes:
+      - ./nginx.test.conf:/etc/nginx/nginx.conf:ro
+      - ./config:/usr/share/nginx/clash-config:ro
+      - ./html:/usr/share/nginx/html:ro
+      - ./test-suite/temp:/tmp/clash-temp:ro
+    networks:
+      - clash-test-network
+    depends_on:
+      clash:
+        condition: service_healthy
+      config-generator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health", "||", "exit", "1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+
+  # 监控和日志收集器
+  monitoring:
+    image: alpine:latest
+    container_name: clash-monitoring-test
+    restart: unless-stopped
+    volumes:
+      - ./test-suite/temp:/tmp/clash-temp
+      - ./logs:/var/log/clash
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - clash-test-network
+    command: >
+      sh -c "
+        apk add --no-cache curl docker-cli jq &&
+        mkdir -p /var/log/clash &&
+        echo 'Starting monitoring service...' &&
+        while true; do
+          echo '=== Monitoring Report $(date) ===' >> /var/log/clash/monitoring.log &&
+          echo 'Container Status:' >> /var/log/clash/monitoring.log &&
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' --filter 'name=clash' >> /var/log/clash/monitoring.log 2>/dev/null || echo 'Failed to get container status' >> /var/log/clash/monitoring.log &&
+          echo 'Service Health:' >> /var/log/clash/monitoring.log &&
+          curl -s http://clash-test:${CLASH_CONTROL_PORT:-19090}/version 2>/dev/null | jq '.' >> /var/log/clash/monitoring.log 2>/dev/null || echo 'Clash API not accessible' >> /var/log/clash/monitoring.log &&
+          curl -s http://clash-nginx-test/health 2>/dev/null >> /var/log/clash/monitoring.log || echo 'Nginx health check failed' >> /var/log/clash/monitoring.log &&
+          echo '' >> /var/log/clash/monitoring.log &&
+          sleep 30
+        done
+      "
+    depends_on:
+      clash:
+        condition: service_healthy
+      nginx:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+        reservations:
+          cpus: '0.02'
+          memory: 32M
+
+networks:
+  clash-test-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: clash-test-br
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+volumes:
+  clash-test-config:
+    driver: local
+  clash-test-data:
+    driver: local
+  clash-test-logs:
+    driver: local

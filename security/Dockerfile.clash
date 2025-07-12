@@ -1,0 +1,28 @@
+# 安全加固的 Clash Dockerfile
+# 使用非root用户和最小权限原则
+
+FROM dreamacro/clash:latest
+
+# 创建非root用户
+RUN addgroup -g 1001 clash && \
+    adduser -D -u 1001 -G clash clash
+
+# 创建配置目录并设置权限
+RUN mkdir -p /app/config /app/data /app/logs && \
+    chown -R clash:clash /app
+
+# 复制安全配置
+COPY --chown=clash:clash security/clash-security.yaml /app/config/
+
+# 设置工作目录
+WORKDIR /app
+
+# 切换到非root用户
+USER clash
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --quiet --tries=1 --spider http://localhost:9090/version || exit 1
+
+# 使用安全的启动命令
+ENTRYPOINT ["/clash", "-d", "/app/config"]
