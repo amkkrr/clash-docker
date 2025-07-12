@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clash 配置服务</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        .dashboard-link {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dashboard-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .api-info {
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+        .status.online {
+            background: #4CAF50;
+        }
+        .status.offline {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🛡️ Clash 配置服务</h1>
+            <p class="subtitle">代理配置文件订阅服务</p>
+            
+            <div id="status" class="status offline">检查连接中...</div>
+            
+            <div class="api-info">
+                <h3>📄 配置文件访问</h3>
+                <p><strong>主配置文件:</strong> <a href="/config.yaml" target="_blank">http://localhost/config.yaml</a></p>
+                <p><strong>订阅地址:</strong> <code>http://localhost/config.yaml</code></p>
+                <p><strong>用途:</strong> 在Clash客户端中使用此链接订阅配置</p>
+            </div>
+            
+            <div>
+                <a href="/config.yaml" target="_blank" class="dashboard-link">
+                    📄 下载配置文件
+                </a>
+                <a href="/dashboard/" class="dashboard-link">
+                    🎛️ 管理界面
+                </a>
+            </div>
+            
+            <div class="api-info">
+                <h3>🔧 使用说明</h3>
+                <p>1. 复制订阅地址: <code>http://localhost/config.yaml</code></p>
+                <p>2. 在Clash客户端中添加配置订阅</p>
+                <p>3. 客户端会自动下载并解析YAML配置文件</p>
+                <p>4. 定期更新订阅以获取最新配置</p>
+            </div>
+            
+            <div class="api-info">
+                <h3>📡 API 管理</h3>
+                <p><strong>管理API:</strong> http://localhost/api</p>
+                <p><strong>Dashboard:</strong> <a href="/dashboard/">管理界面</a></p>
+                <p><strong>外部Dashboard:</strong></p>
+                <p>- 官方: <a href="https://clash.razord.top/" target="_blank">clash.razord.top</a></p>
+                <p>- YACD: <a href="http://yacd.haishan.me/" target="_blank">yacd.haishan.me</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 检查配置文件状态
+        async function checkStatus() {
+            try {
+                const response = await fetch('/config.yaml');
+                if (response.ok && response.headers.get('content-type').includes('yaml')) {
+                    document.getElementById('status').textContent = '🟢 配置文件可用';
+                    document.getElementById('status').className = 'status online';
+                } else {
+                    throw new Error('Config file not available');
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = '🔴 配置文件不可用';
+                document.getElementById('status').className = 'status offline';
+            }
+        }
+
+        // 页面加载时检查状态
+        checkStatus();
+        
+        // 每30秒检查一次状态
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

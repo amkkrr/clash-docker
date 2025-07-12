@@ -1,0 +1,56 @@
+
+services:
+  clash:
+    image: dreamacro/clash:latest
+    container_name: clash
+    restart: unless-stopped
+    ports:
+      - "${CLASH_HTTP_PORT:-7890}:7890"
+      - "${CLASH_SOCKS_PORT:-7891}:7891"
+      - "${CLASH_CONTROL_PORT:-9090}:9090"
+    environment:
+      - CLASH_SECRET=${CLASH_SECRET}
+    volumes:
+      - ./config:/root/.config/clash
+      - ./data:/root/.config/clash/data
+    networks:
+      - clash-network
+    command: -d /root/.config/clash -ext-ctl ${CLASH_EXTERNAL_CONTROLLER:-0.0.0.0:9090} -secret ${CLASH_SECRET}
+    depends_on:
+      - config-generator
+
+  config-generator:
+    image: alpine:latest
+    container_name: clash-config-generator
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    env_file:
+      - .env
+    command: sh -c "apk add --no-cache gettext && ./scripts/generate-config.sh"
+    networks:
+      - clash-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: clash-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8088}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config:/usr/share/nginx/clash-config:ro
+      - ./html:/usr/share/nginx/html:ro
+    depends_on:
+      - clash
+      - config-generator
+    networks:
+      - clash-network
+
+networks:
+  clash-network:
+    driver: bridge
+
+volumes:
+  clash-config:
+  clash-data:
