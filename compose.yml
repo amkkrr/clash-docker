@@ -27,9 +27,15 @@ services:
     working_dir: /workspace
     env_file:
       - .env
-    command: sh -c "apk add --no-cache gettext && ./scripts/generate-config.sh"
+    command: >
+      sh -c "
+        apk add --no-cache gettext python3 py3-yaml &&
+        ./scripts/generate-config-universal.sh generate .env &&
+        echo 'Configuration generation completed successfully'
+      "
     networks:
       - clash-network
+    restart: "no"
 
   nginx:
     image: nginx:alpine
