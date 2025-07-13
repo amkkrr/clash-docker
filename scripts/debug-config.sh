@@ -161,11 +161,12 @@ test_config_generation() {
     # 显示关键环境变量
     log_debug "关键环境变量值:"
     for var in CLASH_HTTP_PORT CLASH_SECRET JP_DIRECT_UUID SJC_DIRECT_UUID; do
-        if [[ -n "${!var:-}" ]]; then
+        local var_value="${!var:-}"
+        if [[ -n "$var_value" ]]; then
             if [[ "$var" == *"SECRET"* ]] || [[ "$var" == *"PASSWORD"* ]]; then
-                log_debug "  $var = [已设置，长度: ${#!var}]"
+                log_debug "  $var = [已设置，长度: ${#var_value}]"
             else
-                log_debug "  $var = ${!var}"
+                log_debug "  $var = $var_value"
             fi
         else
             log_warn "  $var = [未设置]"
