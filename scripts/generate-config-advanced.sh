@@ -180,9 +180,17 @@ except Exception as e:
     
     echo "$validation_output"
     
+    # 详细调试信息
+    log_info "调试：验证输出长度 = ${#validation_output}"
+    log_info "调试：查找字符串 = 'YAML syntax validation passed'"
+    
     if echo "$validation_output" | grep -q "YAML syntax validation passed"; then
+        log_info "调试：grep 匹配成功"
         log_success "生成的配置文件YAML语法正确"
     else
+        log_error "调试：grep 匹配失败"
+        log_error "调试：验证输出内容 = '$validation_output'"
+        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | xxd -p)"
         log_error "生成的配置文件YAML语法错误"
         return 1
     fi
@@ -206,9 +214,16 @@ print('All required fields present')
     
     echo "$fields_check_output"
     
+    # 详细调试信息
+    log_info "调试：字段检查输出长度 = ${#fields_check_output}"
+    log_info "调试：查找字符串 = 'All required fields present'"
+    
     if echo "$fields_check_output" | grep -q "All required fields present"; then
+        log_info "调试：字段检查 grep 匹配成功"
         log_success "配置文件包含所有必需字段"
     else
+        log_error "调试：字段检查 grep 匹配失败"
+        log_error "调试：字段检查输出内容 = '$fields_check_output'"
         log_error "配置文件缺少必需字段"
         return 1
     fi
