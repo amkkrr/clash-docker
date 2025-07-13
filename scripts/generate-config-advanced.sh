@@ -169,6 +169,7 @@ validate_generated_config() {
     log_info "验证生成的配置文件..."
     log_info "调试：验证函数被调用，参数: $config_file"
     log_info "调试：验证函数中文件是否存在: $([ -f "$config_file" ] && echo "是" || echo "否")"
+    log_info "调试：验证函数开始 YAML 语法检查"
     
     # YAML语法检查
     local validation_output
@@ -192,19 +193,24 @@ except Exception as e:
     sys.exit(1)
 " 2>&1 || true)
     
+    log_info "调试：Python 验证输出："
     echo "$validation_output"
     
     # 详细调试信息
     log_info "调试：验证输出长度 = ${#validation_output}"
     log_info "调试：查找字符串 = 'YAML syntax validation passed'"
     
-    if echo "$validation_output" | grep -q "YAML syntax validation passed"; then
+    # 强制测试匹配
+    if [[ "$validation_output" == *"YAML syntax validation passed"* ]]; then
+        log_info "调试：字符串匹配成功 (使用 [[ *pattern* ]])"
+        log_success "生成的配置文件YAML语法正确"
+    elif echo "$validation_output" | grep -q "YAML syntax validation passed"; then
         log_info "调试：grep 匹配成功"
         log_success "生成的配置文件YAML语法正确"
     else
-        log_error "调试：grep 匹配失败"
+        log_error "调试：所有匹配方法都失败"
         log_error "调试：验证输出内容 = '$validation_output'"
-        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | xxd -p)"
+        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | xxd -p | head -c 100)"
         log_error "生成的配置文件YAML语法错误"
         return 1
     fi
