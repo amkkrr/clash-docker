@@ -28,6 +28,8 @@ jobs:
       uses: ludeeus/action-shellcheck@master
       with:
         scandir: './scripts'
+        severity: error
+        check_together: yes
         
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
