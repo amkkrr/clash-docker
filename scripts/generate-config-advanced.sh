@@ -215,7 +215,7 @@ except Exception as e:
     else
         log_error "调试：所有匹配方法都失败"
         log_error "调试：验证输出内容 = '$validation_output'"
-        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | xxd -p | head -c 100)"
+        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | od -t x1 -A n | tr -d ' \n' | head -c 100)"
         log_error "生成的配置文件YAML语法错误"
         return 1
     fi
