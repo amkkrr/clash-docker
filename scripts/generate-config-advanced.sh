@@ -172,9 +172,11 @@ validate_generated_config() {
     local config_file="$1"
     
     log_info "验证生成的配置文件..."
+    echo "=== DEBUG: validate_generated_config 函数开始执行 ==="
     log_info "调试：验证函数被调用，参数: $config_file"
     log_info "调试：验证函数中文件是否存在: $([ -f "$config_file" ] && echo "是" || echo "否")"
     log_info "调试：验证函数开始 YAML 语法检查"
+    echo "=== DEBUG: 准备执行 Python YAML 验证 ==="
     
     # YAML语法检查
     local validation_output
@@ -198,8 +200,10 @@ except Exception as e:
     sys.exit(1)
 " 2>&1 || true)
     
+    echo "=== DEBUG: Python 验证完成，开始显示输出 ==="
     log_info "调试：Python 验证输出："
     echo "$validation_output"
+    echo "=== DEBUG: Python 验证输出结束 ==="
     
     # 详细调试信息
     log_info "调试：验证输出长度 = ${#validation_output}"
