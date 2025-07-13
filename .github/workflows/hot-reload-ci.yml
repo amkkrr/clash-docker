@@ -226,7 +226,7 @@ jobs:
         sed -i 's|config/config\.yaml|test-env/config/config.yaml|g' test-compose.yml
         
         # 启动热重载服务
-        docker-compose -f test-compose.yml -p test-clash-docker up -d
+        docker compose -f test-compose.yml -p test-clash-docker up -d
           
     - name: Wait for services
       run: |
@@ -279,7 +279,7 @@ jobs:
       if: always()
       run: |
         echo "=== Hot Reload Service Logs ==="
-        docker-compose -f test-compose.yml -p test-clash-docker logs hot-reload --tail 50
+        docker compose -f test-compose.yml -p test-clash-docker logs hot-reload --tail 50
         
         echo "=== Test Clash Service Logs ==="
         docker logs test-clash --tail 20
@@ -287,7 +287,7 @@ jobs:
     - name: Cleanup test environment
       if: always()
       run: |
-        docker-compose -f test-compose.yml -p test-clash-docker down -v || true
+        docker compose -f test-compose.yml -p test-clash-docker down -v || true
         docker stop test-clash || true
         docker rm test-clash || true
         docker network rm test-clash-network || true
