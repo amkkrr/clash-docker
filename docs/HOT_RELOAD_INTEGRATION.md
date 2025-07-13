@@ -37,7 +37,7 @@ clash:
 在 `.env` 文件中新增热重载配置：
 ```bash
 # Hot Reload Configuration
-HOT_RELOAD_PORT=8080
+HOT_RELOAD_PORT=8081
 HOT_RELOAD_DEBOUNCE_TIME=2000
 HOT_RELOAD_STRATEGY=selective
 HOT_RELOAD_MAX_RESTART_TIME=60000
@@ -79,8 +79,8 @@ docker-compose down
 | Clash SOCKS | 7891 | SOCKS 代理 |
 | Clash Control | 9090 | 管理接口 |
 | Nginx Web | 8088 | Web 界面 |
-| **Hot Reload API** | **8080** | **热重载 HTTP API** |
-| **Hot Reload WebSocket** | **8080** | **实时状态推送** |
+| **Hot Reload API** | **8081** | **热重载 HTTP API** |
+| **Hot Reload WebSocket** | **8081** | **实时状态推送** |
 
 ## 🔧 配置文件监控
 
@@ -136,8 +136,40 @@ docker-compose down
 - 热重载服务需要访问 Docker Socket
 - 首次启动可能需要较长时间构建镜像
 
+## 🔧 故障排除
+
+### 常见问题
+
+1. **端口冲突**
+   - 问题：`port 8080 already in use`
+   - 解决：修改 `.env` 中的 `HOT_RELOAD_PORT=8081`
+
+2. **Clash 配置错误**
+   - 问题：`invalid mode: redir-host`
+   - 解决：已修复配置模板使用 `fake-ip` 模式
+
+3. **依赖服务未启动**
+   - 问题：`container is unhealthy`
+   - 解决：已调整依赖关系，无需等待健康检查
+
+### 验证服务状态
+
+```bash
+# 检查所有服务状态
+sudo docker-compose ps
+
+# 验证热重载服务
+curl http://localhost:8081/health
+
+# 查看监控的文件路径
+curl http://localhost:8081/api/watched-paths
+
+# 查看热重载日志
+sudo docker-compose logs -f hot-reload
+```
+
 ---
 
-**文档版本**: v1.0.0  
+**文档版本**: v1.1.0  
 **最后更新**: 2025-07-13  
 **作者**: Clash Docker 开发团队
