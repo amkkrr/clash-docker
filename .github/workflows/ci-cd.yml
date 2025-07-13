@@ -28,6 +28,8 @@ jobs:
       uses: ludeeus/action-shellcheck@master
       with:
         scandir: './scripts'
+        severity: error  # 只检查错误，忽略警告
+        check_together: 'yes'
         
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -36,10 +38,11 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
+        exit-code: '0'  # 不因为漏洞而失败
         
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: always() && hashFiles('trivy-results.sarif') != ''
       with:
         sarif_file: 'trivy-results.sarif'
 

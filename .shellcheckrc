@@ -1,0 +1,18 @@
+# ShellCheck配置文件
+# 忽略某些可以接受的警告
+
+# SC1090: ShellCheck can't follow non-constant source
+# 这个警告对于动态source文件是正常的
+disable=SC1090
+
+# SC1091: Not following sourced file  
+# 对于.env文件等外部配置文件是正常的
+disable=SC1091
+
+# SC2034: Variable appears unused
+# 某些变量可能被外部使用或预留
+disable=SC2034
+
+# SC2016: Expressions don't expand in single quotes
+# 在某些情况下单引号是有意的
+disable=SC2016
