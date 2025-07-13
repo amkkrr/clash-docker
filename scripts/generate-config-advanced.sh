@@ -54,11 +54,17 @@ validate_template() {
     fi
     
     # 检查模板语法
-    if ! python3 -c "
+    local validation_output
+    validation_output=$(python3 -c "
 import yaml
 import sys
+import os
 try:
-    with open('$CONFIG_TEMPLATE', 'r') as f:
+    template_path = '$CONFIG_TEMPLATE'
+    if not os.path.exists(template_path):
+        print(f'Template file not found: {template_path}')
+        sys.exit(1)
+    with open(template_path, 'r') as f:
         content = f.read()
     # 简单检查环境变量语法
     if '\${' in content and '}' in content:
@@ -72,7 +78,11 @@ except yaml.YAMLError as e:
 except Exception as e:
     print(f'Template validation error: {e}')
     sys.exit(1)
-" 2>/dev/null; then
+" 2>&1)
+    
+    echo "$validation_output"
+    
+    if echo "$validation_output" | grep -q "Template syntax validation passed"; then
         log_success "配置模板语法验证通过"
     else
         log_error "配置模板语法验证失败"
