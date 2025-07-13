@@ -3,6 +3,9 @@ import { createServer } from 'http';
 import { ConfigChange, RestartResult } from '../src/types';
 import Client from 'socket.io-client';
 
+// 模拟环境变量以避免metrics interval
+process.env.NODE_ENV = 'test';
+
 describe('RealtimeBroadcaster', () => {
   let httpServer: any;
   let broadcaster: RealtimeBroadcaster;

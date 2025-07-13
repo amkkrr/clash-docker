@@ -239,10 +239,23 @@ export class ConfigFileWatcher extends EventEmitter {
     return new Map(this.configCache);
   }
 
-  public stop(): void {
-    this.logger.info('Stopping config file watcher');
-    if (this.watcher) {
-      this.watcher.close();
-    }
+  public stop(): Promise<void> {
+    return new Promise((resolve) => {
+      this.logger.info('Stopping config file watcher');
+      if (this.watcher) {
+        this.watcher
+          .close()
+          .then(() => {
+            this.logger.info('Config file watcher stopped');
+            resolve();
+          })
+          .catch((error) => {
+            this.logger.error('Error stopping watcher:', error);
+            resolve(); // Still resolve to prevent hanging
+          });
+      } else {
+        resolve();
+      }
+    });
   }
 }

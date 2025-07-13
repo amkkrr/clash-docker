@@ -16,7 +16,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist coverage",
-    "prepare": "test \"$CI\" = true || husky install",
+    "prepare": "test \"$CI\" != \"true\" && husky install || true",
     "pre-commit": "lint-staged"
   },
   "dependencies": {

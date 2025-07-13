@@ -4,6 +4,7 @@ import { Logger } from './logger';
 
 export class MetricsCollector {
   private logger: Logger;
+  private metricsInterval?: NodeJS.Timeout;
 
   // 指标定义
   private configChangesCounter = new Counter({
@@ -171,8 +172,13 @@ export class MetricsCollector {
 
   // 启动定期指标更新
   private startPeriodicMetrics(): void {
+    // 只在非测试环境启动定期指标
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
     // 每30秒更新一次内存使用情况
-    setInterval(() => {
+    this.metricsInterval = setInterval(() => {
       const memUsage = process.memoryUsage();
       this.memoryUsageGauge.labels('heap_used').set(memUsage.heapUsed);
       this.memoryUsageGauge.labels('heap_total').set(memUsage.heapTotal);
@@ -195,7 +201,19 @@ export class MetricsCollector {
   // 重置所有指标 (用于测试)
   public reset(): void {
     register.clear();
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = undefined;
+    }
     this.logger.info('All metrics reset');
+  }
+
+  // 清理资源
+  public cleanup(): void {
+    if (this.metricsInterval) {
+      clearInterval(this.metricsInterval);
+      this.metricsInterval = undefined;
+    }
   }
 
   // 获取当前指标摘要

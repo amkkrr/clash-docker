@@ -1,6 +1,9 @@
 import { SmartRestartController } from '../src/services/SmartRestartController';
 import { ConfigChange } from '../src/types';
 
+// 模拟环境变量以避免metrics interval
+process.env.NODE_ENV = 'test';
+
 // Mock dockerode
 jest.mock('dockerode', () => {
   return jest.fn().mockImplementation(() => ({
