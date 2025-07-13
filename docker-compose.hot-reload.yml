@@ -1,0 +1,98 @@
+# Clash Docker Hot Reload Service
+
+version: '3.8'
+
+services:
+  hot-reload:
+    build: 
+      context: ./services/hot-reload
+      dockerfile: Dockerfile
+    container_name: clash-hot-reload
+    restart: unless-stopped
+    
+    # 环境变量
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - LOG_LEVEL=info
+      - COMPOSE_PROJECT_NAME=clash-docker
+      - CONFIG_BASE_PATH=/app/config
+      - WATCH_PATHS=.env,config.yaml,rules/,templates/
+      - DEBOUNCE_TIME=2000
+      - RESTART_STRATEGY=selective
+      - MAX_RESTART_TIME=60000
+      - HEALTH_CHECK_TIMEOUT=30000
+      - CORS_ORIGIN=*
+    
+    # 挂载卷
+    volumes:
+      # 配置文件监控 (只读)
+      - ./.env:/app/config/.env:ro
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./config/rules:/app/config/rules:ro
+      - ./config/templates:/app/config/templates:ro
+      
+      # Docker Socket访问 (用于控制其他容器)
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+      # 日志持久化
+      - hot_reload_logs:/app/logs
+      
+      # 数据持久化
+      - hot_reload_data:/app/data
+    
+    # 端口映射
+    ports:
+      - "8080:8080"  # HTTP API和WebSocket端口
+    
+    # 网络配置
+    networks:
+      - clash-network
+    
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # 依赖关系
+    depends_on:
+      clash:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+    
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    
+    # 标签
+    labels:
+      - "com.clash-docker.service=hot-reload"
+      - "com.clash-docker.description=Configuration hot reload service"
+      - "com.clash-docker.version=1.0.0"
+
+# 卷定义
+volumes:
+  hot_reload_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./logs/hot-reload
+  
+  hot_reload_data:
+    driver: local
+
+# 网络配置
+networks:
+  clash-network:
+    external: true

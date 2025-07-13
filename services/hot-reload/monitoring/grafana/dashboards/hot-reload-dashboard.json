@@ -1,0 +1,65 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Hot Reload Service Monitoring",
+    "tags": ["hot-reload", "clash-docker"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "5s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Uptime",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "hot_reload_uptime_seconds",
+            "legendFormat": "Uptime"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "hot_reload_memory_usage_bytes",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Config Changes",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(hot_reload_config_changes_total[5m])",
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Connected Clients",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "hot_reload_connected_clients",
+            "legendFormat": "Clients"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      }
+    ]
+  }
+}
+EOF < /dev/null

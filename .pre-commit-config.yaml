@@ -1,0 +1,85 @@
+repos:
+  # 基本的pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.md$'
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # 针对热重载服务的本地hooks
+  - repo: local
+    hooks:
+      - id: hot-reload-eslint
+        name: Hot Reload ESLint
+        entry: bash -c 'cd services/hot-reload && npm run lint'
+        language: system
+        files: services/hot-reload/.*\.(ts|js)$
+        pass_filenames: false
+        
+      - id: hot-reload-typescript-check
+        name: Hot Reload TypeScript Check
+        entry: bash -c 'cd services/hot-reload && npm run typecheck'
+        language: system
+        files: services/hot-reload/.*\.ts$
+        pass_filenames: false
+        
+      - id: hot-reload-prettier
+        name: Hot Reload Prettier
+        entry: bash -c 'cd services/hot-reload && npm run format:check'
+        language: system
+        files: services/hot-reload/.*\.(ts|json|md)$
+        pass_filenames: false
+        
+      - id: hot-reload-tests
+        name: Hot Reload Tests
+        entry: bash -c 'cd services/hot-reload && npm test -- --passWithNoTests'
+        language: system
+        files: services/hot-reload/.*\.(ts|js)$
+        pass_filenames: false
+        
+      - id: docker-compose-check
+        name: Docker Compose Validation
+        entry: bash -c 'docker-compose -f docker-compose.hot-reload.yml config >/dev/null'
+        language: system
+        files: docker-compose.*\.yml$
+        pass_filenames: false
+        
+      - id: scripts-executable
+        name: Scripts Executable Check
+        entry: bash -c 'find scripts/ -name "*.sh" -exec test -x {} \; || (echo "Some scripts are not executable" && exit 1)'
+        language: system
+        files: scripts/.*\.sh$
+        pass_filenames: false
+
+  # Markdown和文档检查
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.37.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
+        exclude: 'CHANGELOG\.md'
+
+  # YAML格式化
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.3
+    hooks:
+      - id: prettier
+        types_or: [yaml, json]
+        exclude: 'package-lock\.json'
+
+# 配置选项
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'

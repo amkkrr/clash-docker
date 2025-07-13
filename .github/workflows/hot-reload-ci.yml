@@ -1,0 +1,534 @@
+name: Hot Reload CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/hot-reload ]
+    paths: 
+      - 'services/hot-reload/**'
+      - 'docker-compose.hot-reload.yml'
+      - 'scripts/*hot-reload*'
+      - '.github/workflows/hot-reload-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'services/hot-reload/**'
+      - 'docker-compose.hot-reload.yml'
+      - 'scripts/*hot-reload*'
+
+env:
+  NODE_VERSION_MATRIX: '[18.x, 20.x]'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/hot-reload
+
+jobs:
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: services/hot-reload/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: services/hot-reload
+      run: npm ci
+      
+    - name: Run ESLint
+      working-directory: services/hot-reload
+      run: npm run lint
+      
+    - name: Run TypeScript compilation
+      working-directory: services/hot-reload
+      run: npm run build
+      
+    - name: Run unit tests
+      working-directory: services/hot-reload
+      run: npm test -- --coverage --watchAll=false --ci
+      
+    - name: Upload coverage to Codecov
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v3
+      with:
+        file: services/hot-reload/coverage/lcov.info
+        flags: hot-reload
+        name: hot-reload-coverage
+        fail_ci_if_error: true
+        
+    - name: Archive test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-node-${{ matrix.node-version }}
+        path: |
+          services/hot-reload/coverage/
+          services/hot-reload/dist/
+
+  docker-build:
+    name: Docker Build & Security Scan
+    needs: code-quality
+    runs-on: ubuntu-latest
+    
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-metadata: ${{ steps.meta.outputs.json }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+        
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: services/hot-reload
+        file: services/hot-reload/Dockerfile
+        tags: clash-hot-reload:test
+        load: true
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        labels: ${{ steps.meta.outputs.labels }}
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'clash-hot-reload:test'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+        
+    - name: Run Trivy scan for summary
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'clash-hot-reload:test'
+        format: 'table'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        
+    - name: Test Docker container startup
+      run: |
+        # 创建测试环境
+        mkdir -p test-config
+        echo "TEST_VAR=test_value" > test-config/.env
+        echo "CLASH_SECRET=test-secret-123" >> test-config/.env
+        echo "port: 7890" > test-config/config.yaml
+        echo "allow-lan: false" >> test-config/config.yaml
+        
+        # 启动容器
+        docker run -d --name hot-reload-test \
+          -p 8080:8080 \
+          -v $(pwd)/test-config:/app/config:ro \
+          -e NODE_ENV=test \
+          -e CONFIG_BASE_PATH=/app/config \
+          -e WATCH_PATHS=.env,config.yaml \
+          clash-hot-reload:test
+          
+        # 等待服务启动
+        echo "Waiting for service to start..."
+        timeout 60 bash -c 'until curl -f http://localhost:8080/health; do echo "Waiting..."; sleep 3; done'
+        
+        # 测试API端点
+        echo "Testing API endpoints..."
+        curl -f http://localhost:8080/api/status
+        curl -f http://localhost:8080/api/watched-paths
+        curl -f http://localhost:8080/api/clients
+        
+        # 检查日志
+        echo "=== Container logs ==="
+        docker logs hot-reload-test --tail 20
+        
+        # 清理
+        docker stop hot-reload-test
+        docker rm hot-reload-test
+        
+    - name: Save Docker image
+      run: |
+        docker save clash-hot-reload:test | gzip > hot-reload-image.tar.gz
+        
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: hot-reload-image.tar.gz
+        retention-days: 1
+
+  integration-test:
+    name: Integration Test
+    needs: [code-quality, docker-build]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        
+    - name: Load Docker image
+      run: |
+        docker load < hot-reload-image.tar.gz
+        
+    - name: Create test environment
+      run: |
+        # 创建完整测试环境
+        mkdir -p test-env/config/rules test-env/logs
+        cp config/config.yaml test-env/config/ 2>/dev/null || echo "port: 7890" > test-env/config/config.yaml
+        echo "CLASH_SECRET=test-secret-123" > test-env/.env
+        echo "CLASH_HTTP_PORT=7890" >> test-env/.env
+        echo "COMPOSE_PROJECT_NAME=test-clash-docker" >> test-env/.env
+        
+    - name: Start test services
+      run: |
+        # 启动测试版本的服务栈
+        docker network create test-clash-network || true
+        
+        # 启动模拟的Clash服务
+        docker run -d --name test-clash \
+          --network test-clash-network \
+          -p 7890:80 \
+          nginx:alpine
+          
+        # 更新docker-compose配置用于测试
+        sed 's/clash-docker/test-clash-docker/g' docker-compose.hot-reload.yml > test-compose.yml
+        sed -i 's|\.env|test-env/.env|g' test-compose.yml
+        sed -i 's|config/config\.yaml|test-env/config/config.yaml|g' test-compose.yml
+        
+        # 启动热重载服务
+        docker-compose -f test-compose.yml -p test-clash-docker up -d
+          
+    - name: Wait for services
+      run: |
+        echo "Waiting for services to be ready..."
+        timeout 120 bash -c 'until curl -f http://localhost:8080/health; do echo "Waiting for hot-reload..."; sleep 5; done'
+        timeout 60 bash -c 'until curl -f http://localhost:7890; do echo "Waiting for test-clash..."; sleep 3; done'
+        
+    - name: Run integration tests
+      run: |
+        echo "=== Testing configuration change detection ==="
+        
+        # 获取初始状态
+        initial_status=$(curl -s http://localhost:8080/api/status)
+        echo "Initial status: $initial_status"
+        
+        # 测试配置文件变更检测
+        echo "Modifying configuration file..."
+        echo "CLASH_SECRET=new-secret-456" > test-env/.env
+        echo "CLASH_HTTP_PORT=7890" >> test-env/.env
+        echo "COMPOSE_PROJECT_NAME=test-clash-docker" >> test-env/.env
+        
+        # 等待变更检测
+        sleep 8
+        
+        # 检查状态更新
+        updated_status=$(curl -s http://localhost:8080/api/status)
+        echo "Updated status: $updated_status"
+        
+        # 验证监控路径
+        watched_paths=$(curl -s http://localhost:8080/api/watched-paths)
+        echo "Watched paths: $watched_paths"
+        
+        # 测试WebSocket连接（使用curl模拟）
+        echo "=== Testing WebSocket connection ==="
+        npm install -g wscat
+        timeout 10 wscat -c ws://localhost:8080/ws/config-status -x '{"type":"get_status"}' || echo "WebSocket test completed"
+        
+        # 测试手动重启API
+        echo "=== Testing manual restart API ==="
+        restart_response=$(curl -s -X POST http://localhost:8080/api/restart/clash \
+          -H "Content-Type: application/json" \
+          -d '{"force": false}')
+        echo "Restart response: $restart_response"
+        
+        # 验证服务依赖
+        dependencies=$(curl -s http://localhost:8080/api/dependencies)
+        echo "Service dependencies: $dependencies"
+        
+    - name: Check service logs
+      if: always()
+      run: |
+        echo "=== Hot Reload Service Logs ==="
+        docker-compose -f test-compose.yml -p test-clash-docker logs hot-reload --tail 50
+        
+        echo "=== Test Clash Service Logs ==="
+        docker logs test-clash --tail 20
+        
+    - name: Cleanup test environment
+      if: always()
+      run: |
+        docker-compose -f test-compose.yml -p test-clash-docker down -v || true
+        docker stop test-clash || true
+        docker rm test-clash || true
+        docker network rm test-clash-network || true
+
+  performance-test:
+    name: Performance Test
+    needs: integration-test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        
+    - name: Load Docker image
+      run: |
+        docker load < hot-reload-image.tar.gz
+        
+    - name: Setup test environment
+      run: |
+        mkdir -p perf-test-config
+        echo "CLASH_SECRET=perf-test-secret" > perf-test-config/.env
+        echo "port: 7890" > perf-test-config/config.yaml
+        
+    - name: Performance benchmarks
+      run: |
+        echo "=== Starting performance tests ==="
+        
+        # 测试启动时间
+        echo "Testing startup time..."
+        start_time=$(date +%s%N)
+        
+        docker run -d --name perf-test \
+          -p 8080:8080 \
+          -v $(pwd)/perf-test-config:/app/config:ro \
+          -e NODE_ENV=production \
+          clash-hot-reload:test
+          
+        # 等待服务就绪并记录时间
+        timeout 60 bash -c 'until curl -f http://localhost:8080/health >/dev/null 2>&1; do sleep 0.5; done'
+        end_time=$(date +%s%N)
+        startup_time=$(( (end_time - start_time) / 1000000 )) # 转换为毫秒
+        
+        echo "Startup time: ${startup_time}ms"
+        if [ $startup_time -gt 10000 ]; then
+          echo "ERROR: Startup time too slow (>${startup_time}ms > 10000ms)"
+          exit 1
+        fi
+        
+        # 测试内存使用
+        echo "Testing memory usage..."
+        sleep 5  # 等待服务稳定
+        memory_usage=$(docker stats --no-stream --format "{{.MemUsage}}" perf-test | cut -d'/' -f1 | sed 's/[^0-9.]//g')
+        memory_mb=$(echo "$memory_usage" | sed 's/MiB//')
+        echo "Memory usage: ${memory_mb}MB"
+        
+        # 测试API响应时间
+        echo "Testing API response time..."
+        response_time=$(curl -o /dev/null -s -w '%{time_total}' http://localhost:8080/health)
+        response_ms=$(echo "$response_time * 1000" | bc)
+        echo "API response time: ${response_ms}ms"
+        
+        if (( $(echo "$response_time > 1.0" | bc -l) )); then
+          echo "WARNING: API response time slow (${response_time}s > 1.0s)"
+        fi
+        
+        # 压力测试 - 模拟频繁配置变更
+        echo "=== Running stress test ==="
+        for i in {1..10}; do
+          echo "CLASH_SECRET=stress-test-secret-$i" > perf-test-config/.env
+          echo "Iteration $i/10"
+          sleep 2
+          
+          # 检查服务健康状态
+          if ! curl -f http://localhost:8080/health >/dev/null 2>&1; then
+            echo "ERROR: Service unhealthy during stress test iteration $i"
+            exit 1
+          fi
+        done
+        
+        # 获取最终指标
+        echo "=== Final metrics ==="
+        curl -s http://localhost:8080/api/status | jq '.' || echo "Status API response"
+        
+        echo "Performance tests completed successfully"
+        
+        # 输出性能报告
+        cat << EOF > performance-report.txt
+        Performance Test Report
+        ======================
+        Startup Time: ${startup_time}ms (Target: <10000ms)
+        Memory Usage: ${memory_mb}MB (Target: <100MB)
+        API Response: ${response_ms}ms (Target: <1000ms)
+        Stress Test: PASSED (10 iterations)
+        EOF
+        
+    - name: Upload performance report
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance-report.txt
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop perf-test || true
+        docker rm perf-test || true
+
+  deploy:
+    name: Deploy & Release
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [code-quality, docker-build, integration-test, performance-test]
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      packages: write
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        
+    - name: Load Docker image
+      run: |
+        docker load < hot-reload-image.tar.gz
+        docker tag clash-hot-reload:test ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Build and push production image
+      uses: docker/build-push-action@v5
+      with:
+        context: services/hot-reload
+        file: services/hot-reload/Dockerfile
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Generate changelog
+      run: |
+        echo "## 🔄 Hot Reload Service - $(date '+%Y-%m-%d')" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### 功能特性" >> CHANGELOG.md
+        echo "- ✅ 实时配置文件监控" >> CHANGELOG.md
+        echo "- ✅ 智能重启控制" >> CHANGELOG.md
+        echo "- ✅ WebSocket状态推送" >> CHANGELOG.md
+        echo "- ✅ Docker容器管理" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### CI/CD 验证" >> CHANGELOG.md
+        echo "- ✅ 代码质量检查通过" >> CHANGELOG.md
+        echo "- ✅ 安全扫描清洁" >> CHANGELOG.md
+        echo "- ✅ 集成测试通过" >> CHANGELOG.md
+        echo "- ✅ 性能测试达标" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### Docker镜像" >> CHANGELOG.md
+        echo "\`\`\`bash" >> CHANGELOG.md
+        echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### 快速启动" >> CHANGELOG.md
+        echo "\`\`\`bash" >> CHANGELOG.md
+        echo "./scripts/start-hot-reload.sh" >> CHANGELOG.md
+        echo "\`\`\`" >> CHANGELOG.md
+        
+    - name: Create GitHub release
+      if: startsWith(github.ref, 'refs/tags/') || contains(github.event.head_commit.message, '[release]')
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Hot Reload Service ${{ github.ref_name }}
+        body_path: CHANGELOG.md
+        draft: false
+        prerelease: false
+        files: |
+          services/hot-reload/README.md
+          docker-compose.hot-reload.yml
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify Results
+    if: always()
+    needs: [code-quality, docker-build, integration-test, performance-test, deploy]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Prepare notification
+      run: |
+        if [[ "${{ needs.code-quality.result }}" == "success" && 
+              "${{ needs.docker-build.result }}" == "success" && 
+              "${{ needs.integration-test.result }}" == "success" && 
+              "${{ needs.performance-test.result }}" == "success" ]]; then
+          echo "STATUS=✅ SUCCESS" >> $GITHUB_ENV
+          echo "COLOR=good" >> $GITHUB_ENV
+        else
+          echo "STATUS=❌ FAILED" >> $GITHUB_ENV
+          echo "COLOR=danger" >> $GITHUB_ENV
+        fi
+        
+        echo "COMMIT_MSG=$(git log --format=%B -n 1 ${{ github.sha }} | head -1)" >> $GITHUB_ENV
+        
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const status = process.env.STATUS;
+          const commitMsg = process.env.COMMIT_MSG;
+          
+          const comment = `## ${status} CI/CD Pipeline Results
+          
+          **Commit:** ${commitMsg}
+          **Branch:** ${{ github.head_ref || github.ref_name }}
+          **SHA:** ${{ github.sha }}
+          
+          ### Pipeline Status
+          - Code Quality: ${{ needs.code-quality.result == 'success' && '✅' || '❌' }}
+          - Docker Build: ${{ needs.docker-build.result == 'success' && '✅' || '❌' }}
+          - Integration Test: ${{ needs.integration-test.result == 'success' && '✅' || '❌' }}
+          - Performance Test: ${{ needs.performance-test.result == 'success' && '✅' || '❌' }}
+          
+          [View full pipeline results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

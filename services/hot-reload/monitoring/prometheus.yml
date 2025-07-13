@@ -1,0 +1,48 @@
+# Prometheus configuration for hot reload monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'clash-docker'
+    environment: 'production'
+
+rule_files:
+  - "rules/*.yml"
+
+scrape_configs:
+  # Hot Reload Service
+  - job_name: 'hot-reload'
+    static_configs:
+      - targets: ['hot-reload:9090']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    labels:
+      service: 'hot-reload'
+      component: 'main'
+
+  # Clash Service
+  - job_name: 'clash'
+    static_configs:
+      - targets: ['clash:9090']  # 假设Clash也有指标端点
+    scrape_interval: 30s
+    labels:
+      service: 'clash'
+      component: 'proxy'
+
+  # Prometheus 自身
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    labels:
+      service: 'prometheus'
+      component: 'monitoring'
+
+# 告警规则
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+EOF < /dev/null

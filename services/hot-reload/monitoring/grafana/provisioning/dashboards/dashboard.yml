@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: 'Hot Reload Dashboards'
+    orgId: 1
+    folder: 'Hot Reload'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+EOF < /dev/null

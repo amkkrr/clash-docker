@@ -1,0 +1,309 @@
+# Clash Docker Hot Reload Service - Production Configuration
+
+version: '3.8'
+
+services:
+  hot-reload:
+    image: ghcr.io/your-org/clash-docker/hot-reload:latest
+    container_name: clash-hot-reload-prod
+    restart: unless-stopped
+    
+    # 环境变量 - 生产环境优化
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - LOG_LEVEL=warn
+      - COMPOSE_PROJECT_NAME=clash-docker
+      - CONFIG_BASE_PATH=/app/config
+      - WATCH_PATHS=.env,config.yaml,rules/,templates/
+      - DEBOUNCE_TIME=3000
+      - RESTART_STRATEGY=selective
+      - MAX_RESTART_TIME=120000
+      - HEALTH_CHECK_TIMEOUT=45000
+      - CORS_ORIGIN=https://your-domain.com
+      - MAX_MEMORY_USAGE=400M
+      - ENABLE_METRICS=true
+      - METRICS_PORT=9090
+      - LOG_RETENTION_DAYS=30
+      - BACKUP_ENABLED=true
+      - BACKUP_INTERVAL=86400
+    
+    # 挂载卷 - 生产环境安全配置
+    volumes:
+      # 配置文件监控 (只读)
+      - ./.env:/app/config/.env:ro
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./config/rules:/app/config/rules:ro
+      - ./config/templates:/app/config/templates:ro
+      
+      # Docker Socket访问 (限制权限)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # 日志持久化 (分离存储)
+      - hot_reload_logs:/app/logs
+      
+      # 数据持久化 (配置备份)
+      - hot_reload_data:/app/data
+      
+      # 临时文件存储
+      - hot_reload_tmp:/tmp
+    
+    # 端口映射 - 生产环境端口
+    ports:
+      - "8080:8080"   # HTTP API和WebSocket端口
+      - "9090:9090"   # Prometheus指标端点
+    
+    # 网络配置
+    networks:
+      - clash-network
+      - monitoring-network
+    
+    # 健康检查 - 增强版
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health && curl -f http://localhost:9090/metrics"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    
+    # 依赖关系
+    depends_on:
+      clash:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+    
+    # 资源限制 - 生产环境配置
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    
+    # 安全配置
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,noexec,nosuid,nodev
+    
+    # 用户权限
+    user: "1000:1000"
+    
+    # 标签 - 生产环境标识
+    labels:
+      - "com.clash-docker.service=hot-reload"
+      - "com.clash-docker.environment=production"
+      - "com.clash-docker.description=Configuration hot reload service"
+      - "com.clash-docker.version=1.0.0"
+      - "com.clash-docker.maintainer=ops-team"
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9090"
+      - "prometheus.io/path=/metrics"
+    
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        labels: "service,environment"
+    
+    # DNS配置
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    
+    # 额外主机配置
+    extra_hosts:
+      - "clash-api:127.0.0.1"
+
+  # Prometheus 指标收集服务
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-hot-reload
+    restart: unless-stopped
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    
+    ports:
+      - "9091:9090"
+    
+    networks:
+      - monitoring-network
+    
+    labels:
+      - "com.clash-docker.service=prometheus"
+      - "com.clash-docker.environment=production"
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Grafana 监控面板
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-hot-reload
+    restart: unless-stopped
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    
+    ports:
+      - "3000:3000"
+    
+    networks:
+      - monitoring-network
+    
+    depends_on:
+      - prometheus
+    
+    labels:
+      - "com.clash-docker.service=grafana"
+      - "com.clash-docker.environment=production"
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # Log aggregation service
+  loki:
+    image: grafana/loki:latest
+    container_name: loki-hot-reload
+    restart: unless-stopped
+    
+    command: -config.file=/etc/loki/local-config.yaml
+    
+    volumes:
+      - ./monitoring/loki/config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    
+    ports:
+      - "3100:3100"
+    
+    networks:
+      - monitoring-network
+    
+    labels:
+      - "com.clash-docker.service=loki"
+      - "com.clash-docker.environment=production"
+
+  # Log shipping agent
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail-hot-reload
+    restart: unless-stopped
+    
+    command: -config.file=/etc/promtail/config.yml
+    
+    volumes:
+      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    
+    networks:
+      - monitoring-network
+    
+    depends_on:
+      - loki
+    
+    labels:
+      - "com.clash-docker.service=promtail"
+      - "com.clash-docker.environment=production"
+
+# 卷定义 - 生产环境持久化存储
+volumes:
+  hot_reload_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/log/clash-docker/hot-reload
+  
+  hot_reload_data:
+    driver: local
+    driver_opts:
+      type: none  
+      o: bind
+      device: /var/lib/clash-docker/hot-reload
+  
+  hot_reload_tmp:
+    driver: tmpfs
+    driver_opts:
+      size: 100M
+  
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/prometheus
+  
+  grafana_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/grafana
+  
+  loki_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/loki
+
+# 网络配置 - 生产环境网络隔离
+networks:
+  clash-network:
+    external: true
+    
+  monitoring-network:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
+    labels:
+      - "com.clash-docker.network=monitoring"
+      - "com.clash-docker.environment=production"
+
+# 配置文件模板
+# 需要创建以下配置文件:
+# - ./monitoring/prometheus.yml
+# - ./monitoring/grafana/dashboards/
+# - ./monitoring/grafana/provisioning/
+# - ./monitoring/loki/config.yml  
+# - ./monitoring/promtail/config.yml
