@@ -134,12 +134,16 @@ generate_config() {
     local temp_config="$TEMP_DIR/config-temp-$(date +%s).yaml"
     
     log_info "替换环境变量..."
-    if envsubst < "$CONFIG_TEMPLATE" > "$temp_config"; then
-        log_success "环境变量替换完成"
-    else
-        log_error "环境变量替换失败"
+    local envsubst_stderr_log="$TEMP_DIR/envsubst_stderr.log"
+    if ! envsubst < "$CONFIG_TEMPLATE" > "$temp_config" 2> "$envsubst_stderr_log"; then
+        log_error "环境变量替换失败 (envsubst exited with code $?)"
+        if [[ -s "$envsubst_stderr_log" ]]; then
+            log_error "envsubst 错误详情:"
+            sed 's/^/    /' "$envsubst_stderr_log"
+        fi
         return 1
     fi
+    log_success "环境变量替换完成"
     
     # 验证生成的配置
     log_info "调试：准备验证生成的配置文件: $temp_config"
