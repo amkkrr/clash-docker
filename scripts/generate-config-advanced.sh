@@ -188,7 +188,8 @@ except Exception as e:
     fi
     
     # 检查必要字段
-    if ! python3 -c "
+    local fields_check_output
+    fields_check_output=$(python3 -c "
 import yaml
 with open('$config_file', 'r') as f:
     config = yaml.safe_load(f)
@@ -201,7 +202,11 @@ if missing_fields:
     exit(1)
 
 print('All required fields present')
-" 2>/dev/null; then
+" 2>&1)
+    
+    echo "$fields_check_output"
+    
+    if echo "$fields_check_output" | grep -q "All required fields present"; then
         log_success "配置文件包含所有必需字段"
     else
         log_error "配置文件缺少必需字段"
