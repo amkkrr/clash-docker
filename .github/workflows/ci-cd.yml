@@ -139,13 +139,25 @@ jobs:
       run: |
         echo "运行基础安全检查..."
         
-        # 检查是否有明显的安全问题
-        if grep -r "password\|secret\|key" --include="*.sh" --include="*.yml" scripts/ || true; then
+        # 检查是否有硬编码的敏感信息（排除正常的密码生成函数）
+        if grep -r "password.*=" --include="*.sh" --include="*.yml" scripts/ | grep -v "generate_password\|your_.*_here" | grep -q .; then
           echo "警告：发现可能的敏感信息硬编码"
+          exit 1
+        else
+          echo "✅ 未发现硬编码的敏感信息"
         fi
         
-        # 检查文件权限
-        find scripts/ -name "*.sh" -not -executable && echo "警告：发现不可执行的脚本文件" || true
+        # 检查脚本文件权限
+        non_executable=$(find scripts/ -name "*.sh" -not -executable)
+        if [[ -n "$non_executable" ]]; then
+          echo "❌ 发现不可执行的脚本文件:"
+          echo "$non_executable"
+          exit 1
+        else
+          echo "✅ 所有脚本文件权限正确"
+        fi
+        
+        echo "🔒 安全检查完成"
 
   # 集成测试
   integration-test:
