@@ -16,6 +16,12 @@ services:
     networks:
       - clash-network
     command: -d /root/.config/clash -ext-ctl ${CLASH_EXTERNAL_CONTROLLER:-0.0.0.0:9090} -secret ${CLASH_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/traffic -H 'Authorization: Bearer ${CLASH_SECRET}' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     depends_on:
       - config-generator
 
@@ -52,6 +58,63 @@ services:
     networks:
       - clash-network
 
+  hot-reload:
+    build: 
+      context: ./services/hot-reload
+      dockerfile: Dockerfile
+    container_name: clash-hot-reload
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - LOG_LEVEL=info
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-clash-docker}
+      - CONFIG_BASE_PATH=/app/config
+      - WATCH_PATHS=.env,config.yaml,rules/,templates/
+      - DEBOUNCE_TIME=${HOT_RELOAD_DEBOUNCE_TIME:-2000}
+      - RESTART_STRATEGY=${HOT_RELOAD_STRATEGY:-selective}
+      - MAX_RESTART_TIME=${HOT_RELOAD_MAX_RESTART_TIME:-60000}
+      - HEALTH_CHECK_TIMEOUT=${HOT_RELOAD_HEALTH_CHECK_TIMEOUT:-30000}
+      - CORS_ORIGIN=${HOT_RELOAD_CORS_ORIGIN:-*}
+    volumes:
+      # 配置文件监控 (只读)
+      - ./.env:/app/config/.env:ro
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./config/rules:/app/config/rules:ro
+      - ./config/templates:/app/config/templates:ro
+      # Docker Socket访问
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 持久化存储
+      - hot_reload_logs:/app/logs
+      - hot_reload_data:/app/data
+    ports:
+      - "${HOT_RELOAD_PORT:-8080}:8080"
+    networks:
+      - clash-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      clash:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    labels:
+      - "com.clash-docker.service=hot-reload"
+      - "com.clash-docker.description=Configuration hot reload service"
+      - "com.clash-docker.version=1.0.0"
+
 networks:
   clash-network:
     driver: bridge
@@ -59,3 +122,7 @@ networks:
 volumes:
   clash-config:
   clash-data:
+  hot_reload_logs:
+    driver: local
+  hot_reload_data:
+    driver: local

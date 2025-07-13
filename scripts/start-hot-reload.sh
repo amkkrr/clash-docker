@@ -2,23 +2,12 @@
 
 set -e
 
-echo "🔄 Starting Clash Docker Hot Reload Service..."
+echo "🔄 Starting Clash Docker with Hot Reload Service..."
 
 # 创建必要的目录
 echo "📁 Creating necessary directories..."
 mkdir -p logs/hot-reload
 mkdir -p services/hot-reload/logs
-
-# 检查Docker网络
-echo "🌐 Checking Docker network..."
-if ! docker network ls | grep -q "clash-network"; then
-    echo "Creating clash-network..."
-    docker network create clash-network
-fi
-
-# 构建热重载服务镜像
-echo "🏗️ Building hot reload service image..."
-docker-compose -f docker-compose.hot-reload.yml build
 
 # 检查配置文件
 echo "🔍 Checking configuration files..."
@@ -34,9 +23,13 @@ if [ ! -f "config/config.yaml" ]; then
     exit 1
 fi
 
-# 启动服务
-echo "🚀 Starting hot reload service..."
-docker-compose -f docker-compose.hot-reload.yml up -d
+# 构建热重载服务镜像
+echo "🏗️ Building hot reload service image..."
+docker-compose build hot-reload
+
+# 启动完整的服务栈 (包括热重载)
+echo "🚀 Starting Clash Docker stack with hot reload..."
+docker-compose up -d
 
 # 等待服务启动
 echo "⏳ Waiting for service to be ready..."
@@ -55,23 +48,27 @@ while [ $counter -lt $timeout ]; do
 done
 
 if [ $counter -ge $timeout ]; then
-    echo "❌ Service failed to start within $timeout seconds"
+    echo "❌ Hot reload service failed to start within $timeout seconds"
     echo "Checking logs..."
-    docker-compose -f docker-compose.hot-reload.yml logs hot-reload
+    docker-compose logs hot-reload
     exit 1
 fi
 
 # 显示服务状态
 echo "📊 Service Status:"
-echo "  HTTP API: http://localhost:8080"
-echo "  WebSocket: ws://localhost:8080/ws/config-status"
-echo "  Health Check: http://localhost:8080/health"
+echo "  Clash HTTP: http://localhost:${CLASH_HTTP_PORT:-7890}"
+echo "  Clash SOCKS: socks://localhost:${CLASH_SOCKS_PORT:-7891}"
+echo "  Clash Control: http://localhost:${CLASH_CONTROL_PORT:-9090}"
+echo "  Nginx Web: http://localhost:${NGINX_PORT:-8088}"
+echo "  Hot Reload API: http://localhost:${HOT_RELOAD_PORT:-8080}"
+echo "  Hot Reload WebSocket: ws://localhost:${HOT_RELOAD_PORT:-8080}/ws/config-status"
 
 # 显示监控的文件路径
 echo "📁 Monitored Paths:"
-curl -s http://localhost:8080/api/watched-paths | jq -r '.paths[]' 2>/dev/null || echo "  Failed to retrieve paths"
+curl -s http://localhost:${HOT_RELOAD_PORT:-8080}/api/watched-paths | jq -r '.paths[]' 2>/dev/null || echo "  Failed to retrieve paths"
 
 echo ""
-echo "🎉 Hot reload service started successfully!"
-echo "📝 View logs: docker-compose -f docker-compose.hot-reload.yml logs -f hot-reload"
-echo "🛑 Stop service: docker-compose -f docker-compose.hot-reload.yml down"
+echo "🎉 Clash Docker with hot reload started successfully!"
+echo "📝 View all logs: docker-compose logs -f"
+echo "📝 View hot reload logs: docker-compose logs -f hot-reload"
+echo "🛑 Stop services: docker-compose down"
