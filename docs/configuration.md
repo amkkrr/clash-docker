@@ -1,4 +1,29 @@
-# 配置指南
+# 🔧 配置指南
+
+## 📚 目录
+
+1. [环境变量详解](#环境变量详解)
+   - [基础配置](#基础配置)
+   - [代理服务器配置](#代理服务器配置)
+   - [Clash运行配置](#clash运行配置)
+   - [规则配置](#规则配置)
+2. [代理类型配置详解](#代理类型配置详解)
+   - [Shadowsocks配置](#shadowsocks配置)
+   - [VMess配置](#vmess配置)
+   - [Trojan配置](#trojan配置)
+   - [SOCKS5配置](#socks5配置)
+3. [规则配置](#规则配置)
+   - [域名规则](#域名规则)
+   - [IP规则](#ip规则)
+   - [地理位置规则](#地理位置规则)
+4. [高级配置](#高级配置)
+   - [DNS配置](#dns配置)
+   - [TUN模式](#tun模式)
+   - [实验性功能](#实验性功能)
+5. [配置最佳实践](#配置最佳实践)
+6. [常见问题](#常见问题)
+
+---
 
 ## 环境变量详解
 
@@ -283,11 +308,74 @@ METRICS_PATH=/metrics
 ./scripts/validate-env.sh --network-only
 ```
 
+## 分离式规则架构
+
+本项目支持**分离式规则管理**，将复杂的规则配置从主配置文件中分离出来，提高配置的可维护性。
+
+### 规则架构模式
+
+#### 1. 传统内联模式
+规则直接写在主配置文件的 `rules` 段中：
+```yaml
+rules:
+  - DOMAIN-SUFFIX,google.com,PROXY
+  - DOMAIN-SUFFIX,github.com,PROXY
+  - GEOIP,CN,DIRECT
+```
+
+#### 2. 分离式模式 (推荐)
+规则被分类组织在独立的 `rules-template.yaml` 文件中：
+
+**主配置文件 (clash-template.yaml)**:
+```yaml
+# 基础配置，不包含具体规则
+port: ${CLASH_HTTP_PORT}
+socks-port: ${CLASH_SOCKS_PORT}
+# ... 其他基础配置
+```
+
+**规则配置文件 (rules-template.yaml)**:
+```yaml
+# 高性能代理规则
+high_performance_domains:
+  - DOMAIN-SUFFIX,openrouter.ai,⚡HIGH-PERFORMANCE
+  - DOMAIN-SUFFIX,api.ephone.ai,⚡HIGH-PERFORMANCE
+
+# 直连域名规则
+direct_domains:
+  - DOMAIN-SUFFIX,${PRIVATE_DOMAIN_1},DIRECT
+  - DOMAIN-SUFFIX,${PRIVATE_DOMAIN_2},DIRECT
+
+# 香港相关规则
+hk_rules:
+  - IP-CIDR,${HK_IP_1}/32,1.🇭🇰HK
+  - DOMAIN-SUFFIX,${HK_DOMAIN_1},1.🇭🇰HK
+```
+
+### 分离式规则的优势
+
+1. **分类管理**: 规则按功能和地区分类组织
+2. **易于维护**: 独立文件便于版本控制和协作
+3. **环境变量支持**: 敏感域名和IP通过变量引用
+4. **灵活组合**: 可根据需要启用/禁用特定规则分类
+
+### 规则分类说明
+
+- `high_performance_domains`: 需要高性能代理的域名
+- `direct_domains`: 需要直连的私有域名
+- `direct_ips`: 需要直连的IP段
+- `service_domains`: 特定服务域名规则
+- `region_services`: 地区相关服务规则
+- `hk_rules`: 香港节点专用规则
+- `internal_networks`: 内部网络规则
+
 ## 配置模板
 
-### 基础模板 (.env.basic)
+### 基础模板 (.env.basic.example)
 ```bash
 # 最小配置，适用于简单场景
+# 复制 .env.basic.example 为 .env 并修改相应的值
+
 CLASH_HTTP_PORT=7890
 CLASH_SOCKS_PORT=7891
 CLASH_CONTROL_PORT=9090
@@ -299,10 +387,12 @@ PROXY_PORT_1=443
 PROXY_PASSWORD_1=your_password
 PROXY_CIPHER_1=aes-256-gcm
 
-CLASH_SECRET=your_secret_key
+CLASH_SECRET=your_secret_key_here
 CLASH_MODE=rule
 CLASH_LOG_LEVEL=info
 ```
+
+**使用说明**: 复制 `.env.basic.example` 文件为 `.env`，然后根据实际情况修改配置值。
 
 ### 企业模板 (.env.enterprise)
 ```bash
@@ -349,3 +439,9 @@ HEALTH_CHECK_INTERVAL=10
 ---
 
 *更多配置选项请参考 [Clash 官方文档](https://dreamacro.github.io/clash/)*
+
+---
+
+**更新日期**: 2025-07-13  
+**文档版本**: v1.0.0  
+**维护者**: 配置管理团队

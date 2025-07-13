@@ -1,8 +1,40 @@
 # Clash Docker 企业级解决方案
 
+## 📚 目录
+
+1. [项目概述](#项目概述)
+2. [核心特性](#核心特性)
+3. [项目结构](#项目结构)
+4. [快速开始](#快速开始)
+5. [配置说明](#配置说明)
+6. [部署模式](#部署模式)
+7. [安全特性](#安全特性)
+8. [监控和运维](#监控和运维)
+9. [测试和质量保证](#测试和质量保证)
+10. [故障排除](#故障排除)
+11. [贡献指南](#贡献指南)
+12. [许可证](#许可证)
+13. [支持和联系](#支持和联系)
+
+---
+
 ## 项目概述
 
 这是一个企业级的 Clash 代理服务 Docker 解决方案，提供完整的配置管理、安全加固、监控和测试框架。项目采用环境变量管理敏感信息，支持多环境部署，并实现了全面的安全防护措施。
+
+## 📚 文档导航
+
+- 🔧 **[配置指南](./configuration.md)** - 详细配置说明
+- 🏗️ **[前端开发](./FRONTEND_DEVELOPMENT_PLAN.md)** - 可视化编辑器开发计划
+- 🔍 **[故障排除](./TROUBLESHOOTING.md)** - 问题诊断和解决
+- 📘 **[API文档](./API_REFERENCE.md)** - RESTful API参考
+- 🚀 **[部署指南](./DEPLOYMENT_GUIDE.md)** - 生产环境部署
+- 🔐 **[安全指南](./SECURITY_GUIDE.md)** - 安全配置和最佳实践
+- 🧪 **[测试指南](./TESTING_GUIDE.md)** - 测试策略和自动化
+- 🏛️ **[系统架构](./ARCHITECTURE.md)** - 架构设计和技术选型
+- 🔄 **[迁移指南](./MIGRATION_GUIDE.md)** - 版本升级和平台迁移
+- 🤖 **[自动化部署](./AUTOMATED_DEPLOYMENT.md)** - CI/CD和自动化流程
+- 📋 **[文档检查](./DOCUMENTATION_REVIEW.md)** - 文档质量评估
 
 ## 核心特性
 
@@ -163,7 +195,7 @@ BIND_ADDRESS=127.0.0.1
 - SOCKS5
 - HTTP
 
-详细配置请参考 [配置指南](docs/configuration.md)。
+详细配置请参考 [配置指南](./configuration.md)。
 
 ## 部署模式
 
@@ -205,7 +237,7 @@ docker compose -f compose.yml -f monitoring/compose.monitoring.yml up -d
 - API访问令牌验证
 - 审计日志记录
 
-详细安全配置请参考 [安全指南](security/README.md)。
+详细安全配置请参考 [安全指南](./SECURITY_GUIDE.md)。
 
 ## 监控和运维
 
@@ -218,7 +250,7 @@ docker compose -f compose.yml -f monitoring/compose.monitoring.yml up -d
 ./scripts/health-check.sh services
 
 # 检查系统资源
-./scripts/health-check.sh resources
+./scripts/health-check.sh containers
 ```
 
 ### 日志管理
@@ -327,15 +359,15 @@ tail -f logs/*.log
 
 ## 许可证
 
-本项目采用 MIT 许可证，详见 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 许可证，详见 [LICENSE](../LICENSE) 文件。
 
 ## 支持和联系
 
-- **文档**: [docs/](docs/)
+- **文档**: [docs/](./)
 - **问题报告**: [GitHub Issues](https://github.com/your-org/clash-docker/issues)
 - **安全问题**: security@your-org.com
 
 ---
 
-*最后更新: 2025-07-12*
+*最后更新: 2025-07-13*
 *版本: 1.0.0*
