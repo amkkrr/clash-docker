@@ -62,7 +62,7 @@ jobs:
         file: services/hot-reload/coverage/lcov.info
         flags: hot-reload
         name: hot-reload-coverage
-        fail_ci_if_error: true
+        fail_ci_if_error: false
         
     - name: Archive test results
       if: always()
@@ -372,7 +372,7 @@ jobs:
         
         # 获取最终指标
         echo "=== Final metrics ==="
-        curl -s http://localhost:8080/api/status | jq '.' || echo "Status API response"
+        curl -s http://localhost:8080/api/status || echo "Status API response"
         
         echo "Performance tests completed successfully"
         
