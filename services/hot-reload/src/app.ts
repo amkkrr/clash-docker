@@ -206,20 +206,18 @@ class HotReloadApp {
         await this.restartController!.handleConfigChange(change);
       } catch (error) {
         this.logger.error('Error handling config change:', error);
-        this.broadcaster!.broadcastError(
-          'Config change handling failed',
-          error instanceof Error ? error.message : 'Unknown error'
-        );
+        this.broadcaster!.broadcastError('Config change handling failed', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
       }
     });
 
     // 监听错误事件
     this.configWatcher.on('error', (error) => {
       this.logger.error('Config watcher error:', error);
-      this.broadcaster!.broadcastError(
-        'Config watcher error',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      this.broadcaster!.broadcastError('Config watcher error', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
     });
   }
 
@@ -278,7 +276,7 @@ class HotReloadApp {
       // 关闭HTTP服务器
       if (this.server) {
         await new Promise<void>((resolve) => {
-          this.server.close(() => {
+          this.server!.close(() => {
             this.logger.info('HTTP server closed');
             resolve();
           });
