@@ -1,0 +1,115 @@
+name: Security Scan
+
+on:
+  schedule:
+    # 每天UTC时间2点运行安全扫描
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # 允许手动触发
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'security/**'
+      - 'dockerfiles/**'
+      - '.github/workflows/security-scan.yml'
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run filesystem security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-fs-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        
+    - name: Upload filesystem scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-fs-results.sarif'
+        
+    - name: Run Docker security benchmark
+      run: |
+        if [ -f "security/docker-security-scan.sh" ]; then
+          chmod +x security/docker-security-scan.sh
+          ./security/docker-security-scan.sh || true
+        fi
+        
+    - name: Check for security policy files
+      run: |
+        echo "检查安全策略文件..."
+        if [ -f "SECURITY.md" ]; then
+          echo "✓ 找到安全策略文件"
+        else
+          echo "⚠️  建议添加 SECURITY.md 文件"
+        fi
+        
+        if [ -f ".github/dependabot.yml" ]; then
+          echo "✓ 找到 Dependabot 配置"
+        else
+          echo "⚠️  建议添加 Dependabot 配置"
+        fi
+        
+    - name: Scan Docker images for vulnerabilities
+      run: |
+        echo "扫描项目中使用的Docker镜像..."
+        
+        # 扫描主要镜像
+        docker pull dreamacro/clash:v1.18.0
+        docker pull nginx:1.25.3-alpine
+        docker pull alpine:3.18.3
+        
+        echo "扫描 Clash 镜像..."
+        trivy image --format json --output clash-scan.json dreamacro/clash:v1.18.0
+        
+        echo "扫描 Nginx 镜像..."
+        trivy image --format json --output nginx-scan.json nginx:1.25.3-alpine
+        
+        echo "扫描 Alpine 镜像..."
+        trivy image --format json --output alpine-scan.json alpine:3.18.3
+        
+    - name: Generate security report
+      run: |
+        echo "# 安全扫描报告" > security-report.md
+        echo "生成时间: $(date)" >> security-report.md
+        echo "" >> security-report.md
+        
+        echo "## 镜像漏洞统计" >> security-report.md
+        
+        if [ -f "clash-scan.json" ]; then
+          echo "### Clash 镜像 (dreamacro/clash:v1.18.0)" >> security-report.md
+          jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH") | "- \(.VulnerabilityID): \(.Severity) - \(.Title)"' clash-scan.json >> security-report.md || echo "无高危漏洞" >> security-report.md
+        fi
+        
+        if [ -f "nginx-scan.json" ]; then
+          echo "### Nginx 镜像 (nginx:1.25.3-alpine)" >> security-report.md
+          jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH") | "- \(.VulnerabilityID): \(.Severity) - \(.Title)"' nginx-scan.json >> security-report.md || echo "无高危漏洞" >> security-report.md
+        fi
+        
+        if [ -f "alpine-scan.json" ]; then
+          echo "### Alpine 镜像 (alpine:3.18.3)" >> security-report.md
+          jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH") | "- \(.VulnerabilityID): \(.Severity) - \(.Title)"' alpine-scan.json >> security-report.md || echo "无高危漏洞" >> security-report.md
+        fi
+        
+        cat security-report.md
+        
+    - name: Upload security artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results
+        path: |
+          security-report.md
+          *-scan.json
+        retention-days: 30

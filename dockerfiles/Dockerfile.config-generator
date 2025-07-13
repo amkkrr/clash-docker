@@ -1,0 +1,40 @@
+FROM alpine:3.18.3
+
+# 安装必要的依赖
+RUN apk add --no-cache \
+    gettext \
+    python3 \
+    py3-yaml \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# 创建工作目录
+WORKDIR /workspace
+
+# 复制脚本文件
+COPY scripts/ /workspace/scripts/
+COPY config/ /workspace/config/
+
+# 确保脚本具有执行权限
+RUN chmod +x /workspace/scripts/*.sh
+
+# 创建必要的目录
+RUN mkdir -p /workspace/logs /workspace/test-suite/temp
+
+# 创建启动脚本来处理脚本选择逻辑
+RUN echo '#!/bin/bash' > /workspace/entrypoint.sh && \
+    echo 'if [ ! -f "./scripts/generate-config-universal.sh" ]; then' >> /workspace/entrypoint.sh && \
+    echo '  if [ -f "./scripts/generate-config-advanced.sh" ]; then' >> /workspace/entrypoint.sh && \
+    echo '    cp ./scripts/generate-config-advanced.sh ./scripts/generate-config-universal.sh' >> /workspace/entrypoint.sh && \
+    echo '  elif [ -f "./scripts/generate-config.sh" ]; then' >> /workspace/entrypoint.sh && \
+    echo '    cp ./scripts/generate-config.sh ./scripts/generate-config-universal.sh' >> /workspace/entrypoint.sh && \
+    echo '  else' >> /workspace/entrypoint.sh && \
+    echo '    echo "ERROR: No config generation script found!" && exit 1' >> /workspace/entrypoint.sh && \
+    echo '  fi' >> /workspace/entrypoint.sh && \
+    echo '  chmod +x ./scripts/generate-config-universal.sh' >> /workspace/entrypoint.sh && \
+    echo 'fi' >> /workspace/entrypoint.sh && \
+    echo './scripts/generate-config-universal.sh "$@"' >> /workspace/entrypoint.sh && \
+    chmod +x /workspace/entrypoint.sh
+
+# 设置入口点
+ENTRYPOINT ["/workspace/entrypoint.sh"]

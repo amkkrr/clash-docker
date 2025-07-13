@@ -1,0 +1,51 @@
+version: 2
+updates:
+  # 监控Docker镜像更新
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "@octocat"  # 替换为实际的审查者
+    assignees:
+      - "@octocat"  # 替换为实际的分配者
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+    
+  # 监控Dockerfile中的基础镜像
+  - package-ecosystem: "docker" 
+    directory: "/dockerfiles"
+    schedule:
+      interval: "weekly"
+      day: "monday" 
+      time: "02:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "dockerfiles"
+      
+  # 监控GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00" 
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
