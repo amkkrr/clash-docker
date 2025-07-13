@@ -24,10 +24,10 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # 日志函数
-log_info() { echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_warn() { echo -e "${YELLOW}[WARN]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
+log_info() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${BLUE}[INFO]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
+log_warn() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${YELLOW}[WARN]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
+log_error() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${RED}[ERROR]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
+log_success() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${GREEN}[SUCCESS]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
 
 # 错误处理
 cleanup_on_error() {
