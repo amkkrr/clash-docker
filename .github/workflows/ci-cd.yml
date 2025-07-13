@@ -28,8 +28,8 @@ jobs:
       uses: ludeeus/action-shellcheck@master
       with:
         scandir: './scripts'
-        severity: error  # 只检查错误，忽略警告
-        check_together: 'yes'
+        severity: error
+        check_together: yes
         
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -112,7 +112,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           
     - name: Build and push config-generator image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./dockerfiles/Dockerfile.config-generator
