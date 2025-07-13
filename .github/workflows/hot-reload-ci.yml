@@ -66,7 +66,7 @@ jobs:
         
     - name: Archive test results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-results-node-${{ matrix.node-version }}
         path: |
@@ -174,7 +174,7 @@ jobs:
         docker save clash-hot-reload:test | gzip > hot-reload-image.tar.gz
         
     - name: Upload Docker image artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: docker-image
         path: hot-reload-image.tar.gz
@@ -190,7 +190,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Download Docker image
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: docker-image
         
@@ -300,7 +300,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Download Docker image
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: docker-image
         
@@ -387,7 +387,7 @@ jobs:
         EOF
         
     - name: Upload performance report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-report
         path: performance-report.txt
@@ -414,7 +414,7 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Download Docker image
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: docker-image
         
