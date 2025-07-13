@@ -190,13 +190,6 @@ generate_config() {
     log_success "环境变量替换完成"
     
     # 验证生成的配置
-    log_info "调试：准备验证生成的配置文件: $temp_config"
-    log_info "调试：临时配置文件是否存在: $([ -f "$temp_config" ] && echo "是" || echo "否")"
-    if [ -f "$temp_config" ]; then
-        log_info "调试：临时配置文件大小: $(wc -c < "$temp_config") 字节"
-        log_info "调试：临时配置文件前5行:"
-        head -5 "$temp_config" || true
-    fi
     
     validate_generated_config "$temp_config"
     
@@ -212,14 +205,11 @@ validate_generated_config() {
     local config_file="$1"
     
     log_info "验证生成的配置文件..."
-    echo "=== DEBUG: validate_generated_config 函数开始执行 ==="
-    log_info "调试：验证函数被调用，参数: $config_file"
-    log_info "调试：验证函数中文件是否存在: $([ -f "$config_file" ] && echo "是" || echo "否")"
-    log_info "调试：验证函数开始 YAML 语法检查"
-    echo "=== DEBUG: 准备执行 Python YAML 验证 ==="
     
     # YAML语法检查
     local validation_output
+    local python_exit_code
+    
     validation_output=$(python3 -c "
 import yaml
 import sys
@@ -238,33 +228,22 @@ except yaml.YAMLError as e:
 except Exception as e:
     print(f'Config validation error: {e}')
     sys.exit(1)
-" 2>&1 || true)
+" 2>&1)
+    python_exit_code=$?
     
-    echo "=== DEBUG: Python 验证完成，开始显示输出 ==="
-    log_info "调试：Python 验证输出："
     echo "$validation_output"
-    echo "=== DEBUG: Python 验证输出结束 ==="
     
-    # 详细调试信息
-    log_info "调试：验证输出长度 = ${#validation_output}"
-    log_info "调试：查找字符串 = 'YAML syntax validation passed'"
-    
-    # 强制测试匹配
-    if [[ "$validation_output" == *"YAML syntax validation passed"* ]]; then
-        log_info "调试：字符串匹配成功 (使用 [[ *pattern* ]])"
-        log_success "生成的配置文件YAML语法正确"
-    elif echo "$validation_output" | grep -q "YAML syntax validation passed"; then
-        log_info "调试：grep 匹配成功"
+    # 首先检查 Python 退出码
+    if [[ $python_exit_code -eq 0 ]]; then
         log_success "生成的配置文件YAML语法正确"
     else
-        log_error "调试：所有匹配方法都失败"
-        log_error "调试：验证输出内容 = '$validation_output'"
-        log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | od -t x1 -A n | tr -d ' \n' | head -c 100)"
-        error_exit 5 "生成的配置文件YAML语法错误: $validation_output"
+        error_exit 5 "生成的配置文件YAML语法错误 (Python退出码: $python_exit_code): $validation_output"
     fi
     
     # 检查必要字段
     local fields_check_output
+    local fields_exit_code
+    
     fields_check_output=$(python3 -c "
 import yaml
 with open('$config_file', 'r') as f:
@@ -278,21 +257,15 @@ if missing_fields:
     exit(1)
 
 print('All required fields present')
-" 2>&1 || true)
+" 2>&1)
+    fields_exit_code=$?
     
     echo "$fields_check_output"
     
-    # 详细调试信息
-    log_info "调试：字段检查输出长度 = ${#fields_check_output}"
-    log_info "调试：查找字符串 = 'All required fields present'"
-    
-    if echo "$fields_check_output" | grep -q "All required fields present"; then
-        log_info "调试：字段检查 grep 匹配成功"
+    if [[ $fields_exit_code -eq 0 ]]; then
         log_success "配置文件包含所有必需字段"
     else
-        log_error "调试：字段检查 grep 匹配失败"
-        log_error "调试：字段检查输出内容 = '$fields_check_output'"
-        error_exit 6 "配置文件缺少必需字段: $fields_check_output"
+        error_exit 6 "配置文件缺少必需字段 (退出码: $fields_exit_code): $fields_check_output"
     fi
     
     # 检查环境变量是否全部替换
