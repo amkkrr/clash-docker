@@ -12,9 +12,13 @@ CONFIG_TEMPLATE="$PROJECT_DIR/config/clash-template.yaml"
 CONFIG_OUTPUT="$PROJECT_DIR/config/config.yaml"
 CONFIG_BACKUP_DIR="$PROJECT_DIR/config/backups"
 TEMP_DIR="$PROJECT_DIR/test-suite/temp"
+LOG_DIR="$PROJECT_DIR/logs"
 
 # 创建必要目录
-mkdir -p "$CONFIG_BACKUP_DIR" "$TEMP_DIR"
+mkdir -p "$CONFIG_BACKUP_DIR" "$TEMP_DIR" "$LOG_DIR"
+
+# 设置详细日志文件
+DETAIL_LOG="$LOG_DIR/config-generation-$(date +%Y%m%d-%H%M%S).log"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -23,11 +27,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# 日志函数
-log_info() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${BLUE}[INFO]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_warn() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${YELLOW}[WARN]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_error() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${RED}[ERROR]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
-log_success() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${GREEN}[SUCCESS]${NC} $1" | tee -a "$TEMP_DIR/config-generation.log"; }
+# 日志函数 - 同时输出到控制台和详细日志文件
+log_info() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${BLUE}[INFO]${NC} $1" | tee -a "$DETAIL_LOG"; }
+log_warn() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${YELLOW}[WARN]${NC} $1" | tee -a "$DETAIL_LOG"; }
+log_error() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${RED}[ERROR]${NC} $1" | tee -a "$DETAIL_LOG"; }
+log_success() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${GREEN}[SUCCESS]${NC} $1" | tee -a "$DETAIL_LOG"; }
 
 # 错误处理
 cleanup_on_error() {
@@ -160,6 +164,7 @@ generate_config() {
     mv "$temp_config" "$CONFIG_OUTPUT"
     
     log_success "配置文件生成完成: $CONFIG_OUTPUT"
+    log_info "详细日志已保存到: $DETAIL_LOG"
 }
 
 # 验证生成的配置文件
