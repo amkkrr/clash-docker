@@ -16,12 +16,6 @@ services:
     networks:
       - clash-network
     command: -d /root/.config/clash -ext-ctl ${CLASH_EXTERNAL_CONTROLLER:-0.0.0.0:9090} -secret ${CLASH_SECRET}
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9090/traffic -H 'Authorization: Bearer ${CLASH_SECRET}' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     depends_on:
       - config-generator
 
@@ -88,7 +82,7 @@ services:
       - hot_reload_logs:/app/logs
       - hot_reload_data:/app/data
     ports:
-      - "${HOT_RELOAD_PORT:-8080}:8080"
+      - "${HOT_RELOAD_PORT:-8081}:8080"
     networks:
       - clash-network
     healthcheck:
@@ -99,7 +93,7 @@ services:
       start_period: 40s
     depends_on:
       clash:
-        condition: service_healthy
+        condition: service_started
       nginx:
         condition: service_started
     deploy:

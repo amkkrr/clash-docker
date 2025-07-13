@@ -6,11 +6,15 @@ secret: "${CLASH_SECRET}"
 ipv6: ${CLASH_IPV6}
 dns:
   enable: true
-  enhanced-mode: redir-host
+  enhanced-mode: fake-ip
   listen: :53
   nameserver:
     - 223.5.5.5
     - 1.1.1.1
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - '*.lan'
+    - localhost.ptlogin2.qq.com
 tun:
   enable: true
   stack: gvisor
