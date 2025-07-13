@@ -220,13 +220,40 @@ jobs:
           -p 7890:80 \
           nginx:alpine
           
-        # 更新docker-compose配置用于测试
-        sed 's/clash-docker/test-clash-docker/g' docker-compose.hot-reload.yml > test-compose.yml
-        sed -i 's|\.env|test-env/.env|g' test-compose.yml
-        sed -i 's|config/config\.yaml|test-env/config/config.yaml|g' test-compose.yml
+        # 创建简化的测试 compose 文件
+        cat > test-compose.yml << 'EOF'
+services:
+  hot-reload:
+    image: clash-hot-reload:test
+    container_name: test-hot-reload
+    ports:
+      - "8080:8080"
+    networks:
+      - test-clash-network
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - LOG_LEVEL=info
+      - CONFIG_BASE_PATH=/app/config
+      - WATCH_PATHS=.env,config.yaml,rules/,templates/
+    volumes:
+      - ./test-env/.env:/app/config/.env:ro
+      - ./test-env/config/config.yaml:/app/config/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  test-clash-network:
+    external: true
+EOF
         
         # 启动热重载服务
-        docker compose -f test-compose.yml -p test-clash-docker up -d
+        docker compose -f test-compose.yml up -d
           
     - name: Wait for services
       run: |
@@ -279,7 +306,7 @@ jobs:
       if: always()
       run: |
         echo "=== Hot Reload Service Logs ==="
-        docker compose -f test-compose.yml -p test-clash-docker logs hot-reload --tail 50
+        docker compose -f test-compose.yml logs hot-reload --tail 50
         
         echo "=== Test Clash Service Logs ==="
         docker logs test-clash --tail 20
@@ -287,7 +314,7 @@ jobs:
     - name: Cleanup test environment
       if: always()
       run: |
-        docker compose -f test-compose.yml -p test-clash-docker down -v || true
+        docker compose -f test-compose.yml down -v || true
         docker stop test-clash || true
         docker rm test-clash || true
         docker network rm test-clash-network || true
