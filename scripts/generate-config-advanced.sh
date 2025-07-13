@@ -157,11 +157,17 @@ validate_generated_config() {
     log_info "验证生成的配置文件..."
     
     # YAML语法检查
-    if ! python3 -c "
+    local validation_output
+    validation_output=$(python3 -c "
 import yaml
 import sys
+import os
 try:
-    with open('$config_file', 'r') as f:
+    config_path = '$config_file'
+    if not os.path.exists(config_path):
+        print(f'Config file not found: {config_path}')
+        sys.exit(1)
+    with open(config_path, 'r') as f:
         yaml.safe_load(f)
     print('YAML syntax validation passed')
 except yaml.YAMLError as e:
@@ -170,7 +176,11 @@ except yaml.YAMLError as e:
 except Exception as e:
     print(f'Config validation error: {e}')
     sys.exit(1)
-" 2>/dev/null; then
+" 2>&1)
+    
+    echo "$validation_output"
+    
+    if echo "$validation_output" | grep -q "YAML syntax validation passed"; then
         log_success "生成的配置文件YAML语法正确"
     else
         log_error "生成的配置文件YAML语法错误"
