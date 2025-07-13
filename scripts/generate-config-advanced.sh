@@ -78,7 +78,7 @@ except yaml.YAMLError as e:
 except Exception as e:
     print(f'Template validation error: {e}')
     sys.exit(1)
-" 2>&1)
+" 2>&1 || true)
     
     echo "$validation_output"
     
@@ -142,6 +142,14 @@ generate_config() {
     fi
     
     # 验证生成的配置
+    log_info "调试：准备验证生成的配置文件: $temp_config"
+    log_info "调试：临时配置文件是否存在: $([ -f "$temp_config" ] && echo "是" || echo "否")"
+    if [ -f "$temp_config" ]; then
+        log_info "调试：临时配置文件大小: $(wc -c < "$temp_config") 字节"
+        log_info "调试：临时配置文件前5行:"
+        head -5 "$temp_config" || true
+    fi
+    
     validate_generated_config "$temp_config"
     
     # 移动到最终位置
@@ -155,6 +163,8 @@ validate_generated_config() {
     local config_file="$1"
     
     log_info "验证生成的配置文件..."
+    log_info "调试：验证函数被调用，参数: $config_file"
+    log_info "调试：验证函数中文件是否存在: $([ -f "$config_file" ] && echo "是" || echo "否")"
     
     # YAML语法检查
     local validation_output
@@ -176,7 +186,7 @@ except yaml.YAMLError as e:
 except Exception as e:
     print(f'Config validation error: {e}')
     sys.exit(1)
-" 2>&1)
+" 2>&1 || true)
     
     echo "$validation_output"
     
@@ -210,7 +220,7 @@ if missing_fields:
     exit(1)
 
 print('All required fields present')
-" 2>&1)
+" 2>&1 || true)
     
     echo "$fields_check_output"
     
