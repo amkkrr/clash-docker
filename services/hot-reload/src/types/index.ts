@@ -34,7 +34,7 @@ export interface SystemStatus {
 export interface WebSocketMessage {
   type: string;
   timestamp: string;
-  data: any;
+  data: Record<string, unknown> | SystemStatus | ConfigChange | RestartResult[];
 }
 
 // 配置差异
@@ -66,7 +66,7 @@ export interface ValidationResult {
 export interface ValidationError {
   path: string;
   message: string;
-  value?: any;
+  value?: unknown;
 }
 
 // 服务依赖关系

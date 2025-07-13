@@ -39,13 +39,17 @@ describe('SmartRestartController', () => {
     };
 
     // 使用私有方法的类型断言
-    const strategy = (controller as any).determineRestartStrategy(criticalChange);
+    const strategy = (
+      controller as unknown as { determineRestartStrategy: (change: unknown) => string }
+    ).determineRestartStrategy(criticalChange);
     expect(strategy).toBe('full');
   });
 
   it('should calculate restart order correctly', () => {
     const services = ['clash', 'nginx', 'web-ui'];
-    const order = (controller as any).calculateRestartOrder(services);
+    const order = (
+      controller as unknown as { calculateRestartOrder: (services: string[]) => string[] }
+    ).calculateRestartOrder(services);
 
     // nginx和web-ui应该在clash之前重启（因为clash依赖它们）
     expect(order.indexOf('web-ui')).toBeLessThan(order.indexOf('nginx'));

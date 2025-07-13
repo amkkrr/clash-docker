@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
+import { createServer, Server } from 'http';
 import dotenv from 'dotenv';
 import path from 'path';
 import { ConfigFileWatcher } from './services/ConfigFileWatcher';
@@ -14,7 +14,7 @@ dotenv.config();
 
 class HotReloadApp {
   private app: express.Application;
-  private server: any;
+  private server: Server | null = null;
   private logger: Logger;
   private configWatcher?: ConfigFileWatcher;
   private restartController?: SmartRestartController;
@@ -142,7 +142,7 @@ class HotReloadApp {
     });
 
     // 错误处理中间件
-    this.app.use((err: any, _req: express.Request, res: express.Response) => {
+    this.app.use((err: Error, _req: express.Request, res: express.Response) => {
       this.logger.error('Express error:', err);
       res.status(500).json({ error: 'Internal server error' });
     });

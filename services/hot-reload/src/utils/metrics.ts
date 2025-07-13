@@ -217,7 +217,7 @@ export class MetricsCollector {
   }
 
   // 获取当前指标摘要
-  public async getMetricsSummary(): Promise<any> {
+  public async getMetricsSummary(): Promise<Record<string, unknown>> {
     try {
       return {
         configChanges: await register.getSingleMetric('hot_reload_config_changes_total')?.get(),

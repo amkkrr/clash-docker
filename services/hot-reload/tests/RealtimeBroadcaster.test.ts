@@ -1,22 +1,24 @@
 import { RealtimeBroadcaster } from '../src/services/RealtimeBroadcaster';
-import { createServer } from 'http';
+import { createServer, Server } from 'http';
+import { AddressInfo } from 'net';
 import { ConfigChange, RestartResult } from '../src/types';
-import Client from 'socket.io-client';
+import Client, { Socket } from 'socket.io-client';
 
 // 模拟环境变量以避免metrics interval
 process.env.NODE_ENV = 'test';
 
 describe('RealtimeBroadcaster', () => {
-  let httpServer: any;
+  let httpServer: Server;
   let broadcaster: RealtimeBroadcaster;
-  let clientSocket: any;
+  let clientSocket: Socket;
 
   beforeEach((done) => {
     httpServer = createServer();
     broadcaster = new RealtimeBroadcaster(httpServer);
 
     httpServer.listen(() => {
-      const port = httpServer.address().port;
+      const address = httpServer.address();
+      const port = address && typeof address !== 'string' ? (address as AddressInfo).port : 3000;
       clientSocket = Client(`http://localhost:${port}`, {
         path: '/ws/config-status',
       });
@@ -27,7 +29,7 @@ describe('RealtimeBroadcaster', () => {
 
   afterEach(() => {
     broadcaster.close();
-    clientSocket.close();
+    (clientSocket as Socket).close();
     httpServer.close();
   });
 
@@ -40,7 +42,7 @@ describe('RealtimeBroadcaster', () => {
       affectedServices: ['clash'],
     };
 
-    clientSocket.on('message', (message: any) => {
+    (clientSocket as Socket).on('message', (message: { type: string; data: Record<string, unknown> }) => {
       if (message.type === 'config_change') {
         expect(message.data.filePath).toBe('.env');
         expect(message.data.severity).toBe('moderate');
@@ -65,7 +67,7 @@ describe('RealtimeBroadcaster', () => {
   it('should broadcast restart completion', (done) => {
     const results: RestartResult[] = [{ success: true, service: 'clash', duration: 5000 }];
 
-    clientSocket.on('message', (message: any) => {
+    (clientSocket as Socket).on('message', (message: { type: string; data: Record<string, unknown> }) => {
       if (message.type === 'restart_completed') {
         expect(message.data.results).toEqual(results);
         expect(message.data.successCount).toBe(1);

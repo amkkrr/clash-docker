@@ -45,19 +45,19 @@ export class Logger {
     });
   }
 
-  public info(message: string, ...meta: any[]): void {
+  public info(message: string, ...meta: unknown[]): void {
     this.logger.info(message, ...meta);
   }
 
-  public warn(message: string, ...meta: any[]): void {
+  public warn(message: string, ...meta: unknown[]): void {
     this.logger.warn(message, ...meta);
   }
 
-  public error(message: string, ...meta: any[]): void {
+  public error(message: string, ...meta: unknown[]): void {
     this.logger.error(message, ...meta);
   }
 
-  public debug(message: string, ...meta: any[]): void {
+  public debug(message: string, ...meta: unknown[]): void {
     this.logger.debug(message, ...meta);
   }
 }

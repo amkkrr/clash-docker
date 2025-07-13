@@ -197,7 +197,7 @@ export class RealtimeBroadcaster extends EventEmitter {
     this.checkAndUpdateSystemStatus();
   }
 
-  public broadcastError(error: string, details?: any): void {
+  public broadcastError(error: string, details?: Record<string, unknown>): void {
     const message: WebSocketMessage = {
       type: 'error',
       timestamp: new Date().toISOString(),

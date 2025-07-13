@@ -122,7 +122,7 @@ export class SmartRestartController extends EventEmitter {
         this.logger.error(`Service ${service} restart failed:`, error);
 
         // 处理重启失败
-        await this.handleRestartFailure(service, error);
+        await this.handleRestartFailure(service, error instanceof Error ? error : new Error(String(error)));
       }
     }
 
@@ -257,7 +257,7 @@ export class SmartRestartController extends EventEmitter {
     await this.waitForContainerReady(container, timeout);
   }
 
-  private async handleRestartFailure(serviceName: string, error: any): Promise<void> {
+  private async handleRestartFailure(serviceName: string, error: Error): Promise<void> {
     // 重启失败处理逻辑
     this.logger.error(`Service ${serviceName} restart failed:`, error);
 
