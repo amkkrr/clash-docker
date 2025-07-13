@@ -24,23 +24,28 @@ NC='\033[0m'
 
 # 增强的日志函数 - 同时输出到控制台和文件
 log_debug() { 
-    local msg="$(date '+%Y-%m-%d %H:%M:%S') [DEBUG] $1"
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') [DEBUG] $1"
     echo -e "${CYAN}$msg${NC}" | tee -a "$DEBUG_LOG"
 }
 log_info() { 
-    local msg="$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"
     echo -e "${BLUE}$msg${NC}" | tee -a "$DEBUG_LOG"
 }
 log_warn() { 
-    local msg="$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1"
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1"
     echo -e "${YELLOW}$msg${NC}" | tee -a "$DEBUG_LOG"
 }
 log_error() { 
-    local msg="$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1"
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1"
     echo -e "${RED}$msg${NC}" | tee -a "$DEBUG_LOG"
 }
 log_success() { 
-    local msg="$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $1"
+    local msg
+    msg="$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $1"
     echo -e "${GREEN}$msg${NC}" | tee -a "$DEBUG_LOG"
 }
 
@@ -48,7 +53,8 @@ log_success() {
 save_data() {
     local name="$1"
     local content="$2"
-    local file="$LOG_DIR/${name}-$(date +%H%M%S).log"
+    local file
+    file="$LOG_DIR/${name}-$(date +%H%M%S).log"
     echo "$content" > "$file"
     log_debug "数据已保存到: $file"
     echo "$file"
