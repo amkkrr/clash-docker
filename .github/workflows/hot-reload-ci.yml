@@ -222,35 +222,35 @@ jobs:
           
         # 创建简化的测试 compose 文件
         cat > test-compose.yml << 'EOF'
-services:
-  hot-reload:
-    image: clash-hot-reload:test
-    container_name: test-hot-reload
-    ports:
-      - "8080:8080"
-    networks:
-      - test-clash-network
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - LOG_LEVEL=info
-      - CONFIG_BASE_PATH=/app/config
-      - WATCH_PATHS=.env,config.yaml,rules/,templates/
-    volumes:
-      - ./test-env/.env:/app/config/.env:ro
-      - ./test-env/config/config.yaml:/app/config/config.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-networks:
-  test-clash-network:
-    external: true
-EOF
+        services:
+          hot-reload:
+            image: clash-hot-reload:test
+            container_name: test-hot-reload
+            ports:
+              - "8080:8080"
+            networks:
+              - test-clash-network
+            environment:
+              - NODE_ENV=production
+              - PORT=8080
+              - LOG_LEVEL=info
+              - CONFIG_BASE_PATH=/app/config
+              - WATCH_PATHS=.env,config.yaml,rules/,templates/
+            volumes:
+              - ./test-env/.env:/app/config/.env:ro
+              - ./test-env/config/config.yaml:/app/config/config.yaml:ro
+              - /var/run/docker.sock:/var/run/docker.sock
+            healthcheck:
+              test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+              interval: 10s
+              timeout: 5s
+              retries: 3
+              start_period: 15s
+        
+        networks:
+          test-clash-network:
+            external: true
+        EOF
         
         # 启动热重载服务
         docker compose -f test-compose.yml up -d
