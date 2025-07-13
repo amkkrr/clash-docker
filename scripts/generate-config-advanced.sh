@@ -33,28 +33,72 @@ log_warn() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${YELLOW}[WARN]${NC} $1" | te
 log_error() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${RED}[ERROR]${NC} $1" | tee -a "$DETAIL_LOG"; }
 log_success() { echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${GREEN}[SUCCESS]${NC} $1" | tee -a "$DETAIL_LOG"; }
 
-# 错误处理
+# 错误处理和分类
+declare -A ERROR_TYPES=(
+    [1]="通用错误"
+    [2]="环境文件错误"
+    [3]="模板验证错误"
+    [4]="配置生成错误"
+    [5]="YAML语法错误"
+    [6]="字段验证错误"
+    [7]="权限错误"
+    [8]="文件不存在错误"
+)
+
+# 专用错误函数
+error_exit() {
+    local error_code=$1
+    local error_message=$2
+    local error_type="${ERROR_TYPES[$error_code]:-未知错误类型}"
+    
+    log_error "❌ 错误类型: $error_type (代码: $error_code)"
+    log_error "❌ 错误详情: $error_message"
+    log_error "❌ 发生时间: $(date '+%Y-%m-%d %H:%M:%S')"
+    
+    # 回滚配置文件（如果需要）
+    if [[ -f "$CONFIG_OUTPUT.backup" ]]; then
+        log_info "🔄 恢复之前的配置文件..."
+        mv "$CONFIG_OUTPUT.backup" "$CONFIG_OUTPUT"
+        log_info "✅ 配置文件已回滚"
+    fi
+    
+    exit $error_code
+}
+
+# 改进的清理函数
 cleanup_on_error() {
     local exit_code=$?
     if [[ $exit_code -ne 0 ]]; then
-        log_error "配置生成失败，退出码: $exit_code"
+        local error_type="${ERROR_TYPES[$exit_code]:-未知错误类型}"
+        log_error "💥 脚本异常退出"
+        log_error "🚨 退出码: $exit_code ($error_type)"
+        log_error "⏰ 异常时间: $(date '+%Y-%m-%d %H:%M:%S')"
+        
+        # 提供调试信息
+        log_error "📍 调试信息:"
+        log_error "   - 当前工作目录: $(pwd)"
+        log_error "   - 配置输出文件: ${CONFIG_OUTPUT:-未设置}"
+        log_error "   - 环境文件: ${ENV_FILE:-未设置}"
+        
         if [[ -f "$CONFIG_OUTPUT.backup" ]]; then
-            log_info "恢复之前的配置文件..."
+            log_info "🔄 自动恢复之前的配置文件..."
             mv "$CONFIG_OUTPUT.backup" "$CONFIG_OUTPUT"
         fi
+    else
+        log_success "✅ 脚本正常完成"
     fi
     exit $exit_code
 }
 
-trap cleanup_on_error EXIT
+# 只在错误时触发清理
+trap cleanup_on_error ERR
 
 # 验证配置模板
 validate_template() {
     log_info "验证配置模板语法..."
     
     if [[ ! -f "$CONFIG_TEMPLATE" ]]; then
-        log_error "配置模板文件不存在: $CONFIG_TEMPLATE"
-        return 1
+        error_exit 8 "配置模板文件不存在: $CONFIG_TEMPLATE"
     fi
     
     # 检查模板语法
@@ -89,8 +133,7 @@ except Exception as e:
     if echo "$validation_output" | grep -q "Template syntax validation passed"; then
         log_success "配置模板语法验证通过"
     else
-        log_error "配置模板语法验证失败"
-        return 1
+        error_exit 3 "配置模板语法验证失败: $validation_output"
     fi
 }
 
@@ -113,14 +156,12 @@ generate_config() {
     
     # 验证环境文件
     if [[ ! -f "$env_file" ]]; then
-        log_error "环境文件不存在: $env_file"
-        return 1
+        error_exit 2 "环境文件不存在: $env_file"
     fi
     
     # 验证环境变量
     if ! "$SCRIPT_DIR/validate-env.sh" "$env_file"; then
-        log_error "环境变量验证失败"
-        return 1
+        error_exit 2 "环境变量验证失败，请检查 $env_file 文件内容"
     fi
     
     # 加载环境变量
@@ -140,12 +181,11 @@ generate_config() {
     log_info "替换环境变量..."
     local envsubst_stderr_log="$TEMP_DIR/envsubst_stderr.log"
     if ! envsubst < "$CONFIG_TEMPLATE" > "$temp_config" 2> "$envsubst_stderr_log"; then
-        log_error "环境变量替换失败 (envsubst exited with code $?)"
+        local envsubst_error=""
         if [[ -s "$envsubst_stderr_log" ]]; then
-            log_error "envsubst 错误详情:"
-            sed 's/^/    /' "$envsubst_stderr_log"
+            envsubst_error=": $(cat "$envsubst_stderr_log")"
         fi
-        return 1
+        error_exit 4 "环境变量替换失败$envsubst_error"
     fi
     log_success "环境变量替换完成"
     
@@ -220,8 +260,7 @@ except Exception as e:
         log_error "调试：所有匹配方法都失败"
         log_error "调试：验证输出内容 = '$validation_output'"
         log_error "调试：验证输出十六进制 = $(echo -n "$validation_output" | od -t x1 -A n | tr -d ' \n' | head -c 100)"
-        log_error "生成的配置文件YAML语法错误"
-        return 1
+        error_exit 5 "生成的配置文件YAML语法错误: $validation_output"
     fi
     
     # 检查必要字段
@@ -253,15 +292,13 @@ print('All required fields present')
     else
         log_error "调试：字段检查 grep 匹配失败"
         log_error "调试：字段检查输出内容 = '$fields_check_output'"
-        log_error "配置文件缺少必需字段"
-        return 1
+        error_exit 6 "配置文件缺少必需字段: $fields_check_output"
     fi
     
     # 检查环境变量是否全部替换
     if grep -q '\${' "$config_file"; then
-        log_warn "配置文件中仍包含未替换的环境变量:"
-        grep '\${' "$config_file" || true
-        return 1
+        local unreplaced_vars=$(grep '\${' "$config_file" | head -5)
+        error_exit 4 "配置文件中仍包含未替换的环境变量: $unreplaced_vars"
     else
         log_success "所有环境变量已正确替换"
     fi
@@ -352,6 +389,7 @@ main() {
             generate_config "$env_file"
             health_check
             cleanup_temp_files
+            log_success "🎉 配置生成流程全部完成！"
             ;;
         "validate")
             "$SCRIPT_DIR/validate-env.sh" "$env_file"
@@ -379,4 +417,7 @@ main() {
 # 脚本入口
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
+    # 显式成功退出
+    log_success "🎉 所有操作完成！"
+    exit 0
 fi
