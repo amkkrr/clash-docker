@@ -1,7 +1,7 @@
 
 services:
   clash:
-    image: dreamacro/clash:v1.18.0
+    image: metacubex/mihomo:latest
     container_name: clash
     restart: unless-stopped
     ports:
